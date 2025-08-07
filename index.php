@@ -28,7 +28,7 @@
            ================================================================= */
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 1800px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -101,14 +101,45 @@
             text-align: center;
             margin: 10px 0;
         }
+        
+        /* =================================================================
+           NAVIGATION STYLING
+           ================================================================= */
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .nav-links a {
+            color: #007bff;
+            text-decoration: none;
+            margin-left: 15px;
+            font-weight: 500;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <!-- =================================================================
-             HEADER AND INTRODUCTION
+             NAVIGATION HEADER
              ================================================================= -->
-        <h1>AI Personal Assistant - Core v1</h1>
+        <div class="nav-header">
+            <h1>AI Personal Assistant - Core v1</h1>
+            <div class="nav-links">
+                <a href="dashboard.php">📊 Dashboard</a>
+                <a href="#" onclick="clearChat()">🗑️ Clear Chat</a>
+            </div>
+        </div>
+        
+        <!-- =================================================================
+             INTRODUCTION
+             ================================================================= -->
         <p>Welcome to your intelligent personal assistant. This system uses a triage-first, agent-based architecture to understand and manage your life data.</p>
         
         <!-- =================================================================
@@ -130,13 +161,41 @@
              EXAMPLE QUERIES AND HELP
              ================================================================= -->
         <div style="margin-top: 20px; font-size: 12px; color: #666;">
-            <strong>Example queries:</strong>
-            <ul>
-                <li>"I spent $25 on lunch at McDonald's today"</li>
-                <li>"Schedule a meeting with John tomorrow at 3 PM"</li>
-                <li>"Remember that Sarah likes coffee"</li>
-                <li>"What's my total spending this month?"</li>
-            </ul>
+            <strong>💡 Try these example queries to see different agents in action:</strong>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
+                <div>
+                    <strong>💰 Finance Agent:</strong>
+                    <ul style="margin: 5px 0; padding-left: 15px;">
+                        <li>"I spent $25 on lunch at McDonald's"</li>
+                        <li>"I earned $1000 from freelancing"</li>
+                        <li>"Paid $150 for groceries with my card"</li>
+                    </ul>
+                </div>
+                <div>
+                    <strong>📅 Planner Agent:</strong>
+                    <ul style="margin: 5px 0; padding-left: 15px;">
+                        <li>"Schedule meeting with John tomorrow 3 PM"</li>
+                        <li>"Remind me to call dentist next Friday"</li>
+                        <li>"Add gym workout to my routine"</li>
+                    </ul>
+                </div>
+                <div>
+                    <strong>🧠 Memory Agent:</strong>
+                    <ul style="margin: 5px 0; padding-left: 15px;">
+                        <li>"Remember that Sarah likes coffee"</li>
+                        <li>"John works at Google as a developer"</li>
+                        <li>"My favorite restaurant is Tony's Pizza"</li>
+                    </ul>
+                </div>
+                <div>
+                    <strong>💬 General Agent:</strong>
+                    <ul style="margin: 5px 0; padding-left: 15px;">
+                        <li>"What's the weather like?"</li>
+                        <li>"Tell me a joke"</li>
+                        <li>"How are you today?"</li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -243,7 +302,27 @@
             if (statusElements.length > 1) {
                 statusElements[statusElements.length - 1].remove();
             }
-        }        // Allow Enter key to send message
+        }
+        
+        // =================================================================
+        // UTILITY FUNCTIONS
+        // =================================================================
+        
+        /**
+         * Clear the chat interface
+         */
+        function clearChat() {
+            const chatContainer = document.getElementById('chatContainer');
+            chatContainer.innerHTML = '<div class="status">Chat cleared. Ready to assist you!</div>';
+            // Generate new conversation ID for fresh start
+            conversationId = 'conv_' + Date.now();
+        }
+        
+        // =================================================================
+        // EVENT LISTENERS AND INITIALIZATION
+        // =================================================================
+        
+        // Allow Enter key to send message
         document.getElementById('userInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 sendMessage();
