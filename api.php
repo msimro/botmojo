@@ -165,9 +165,17 @@ try {
                     break;
             }
             
-            // Create component using the selected agent
+            // Create component using the selected agent with full context
             if ($agent && method_exists($agent, 'createComponent')) {
-                $assembledComponents[$componentName] = $agent->createComponent($componentData);
+                // Enhance component data with triage context for intelligent processing
+                $enhancedComponentData = array_merge($componentData, [
+                    'triage_summary' => $triageResponse['triage_summary'] ?? '',
+                    'original_query' => $userQuery,
+                    'conversation_id' => $conversationId,
+                    'full_triage_response' => $triageResponse
+                ]);
+                
+                $assembledComponents[$componentName] = $agent->createComponent($enhancedComponentData);
             }
         }
     }
