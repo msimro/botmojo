@@ -14,16 +14,16 @@
 // DATABASE CONFIGURATION
 // =============================================================================
 // MySQL database connection settings for DDEV local environment
-define('DB_HOST', 'localhost');        // Database host (localhost for DDEV)
-define('DB_USER', 'root');              // Database username  
-define('DB_PASS', '');                  // Database password (empty for DDEV)
-define('DB_NAME', 'assistant_core_v1'); // Database name
+define('DB_HOST', 'db');                         // Database host (db for DDEV)
+define('DB_USER', 'db');                         // Database username (db for DDEV)
+define('DB_PASS', 'db');                         // Database password (db for DDEV)
+define('DB_NAME', 'assistant_core_v1');          // Database name
 
 // =============================================================================
 // GOOGLE GEMINI API CONFIGURATION
 // =============================================================================
 // API settings for Google's Gemini AI model integration
-define('GEMINI_API_KEY', 'your_gemini_api_key_here');  // Replace with your actual API key
+define('GEMINI_API_KEY', 'AIzaSyDT4xnhgri4bp_SvWDlLDHREPtgfXexKOw');  // Replace with your actual API key
 define('GEMINI_MODEL', 'gemini-1.5-flash');            // AI model version (fast response)
 define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/' . GEMINI_MODEL . ':generateContent');
 

@@ -232,8 +232,10 @@
                 
             } catch (error) {
                 // Handle network or parsing errors
-                console.error('Error:', error);
-                addMessage('Sorry, I encountered a network error. Please try again.');
+                console.error('Full error details:', error);
+                console.error('Error message:', error.message);
+                console.error('Error stack:', error.stack);
+                addMessage('Sorry, I encountered a network error. Please try again. Error: ' + error.message);
             }
             
             // Remove the processing status message

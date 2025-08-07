@@ -39,11 +39,23 @@ try {
     // =============================================================================
     
     // Parse incoming JSON request
-    $input = json_decode(file_get_contents('php://input'), true);
+    $rawInput = file_get_contents('php://input');
+    
+    // Debug logging if in debug mode
+    if (DEBUG_MODE) {
+        error_log("Raw input received: " . $rawInput);
+    }
+    
+    $input = json_decode($rawInput, true);
+    
+    // Check for JSON parsing errors
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        throw new Exception('Invalid JSON input: ' . json_last_error_msg());
+    }
     
     // Validate required input parameters
     if (!$input || !isset($input['query'])) {
-        throw new Exception('Invalid input. Query is required.');
+        throw new Exception('Invalid input. Query is required. Received: ' . print_r($input, true));
     }
     
     // Extract and sanitize input parameters
@@ -74,9 +86,13 @@ try {
     
     // Build the triage prompt using dynamic template assembly
     $triagePrompt = $promptBuilder->build('base/triage_agent_base.txt', [
-        'conversation_history' => $conversationHistory,
         'agent_definitions' => 'components/agent_definitions.txt',
         'output_format' => 'formats/triage_json_output.txt'
+    ]);
+    
+    // Replace conversation history placeholder with actual content
+    $triagePrompt = $promptBuilder->replacePlaceholders($triagePrompt, [
+        'conversation_history' => $conversationHistory
     ]);
     
     // Append the current user query to the prompt
@@ -90,12 +106,24 @@ try {
         throw new Exception('Failed to get response from AI model.');
     }
     
+    // Clean the response text to handle markdown code blocks
+    $responseText = trim($geminiResponse['text']);
+    
+    // Remove markdown code block markers if present
+    if (strpos($responseText, '```json') !== false) {
+        $responseText = preg_replace('/```json\s*|\s*```/', '', $responseText);
+    } elseif (strpos($responseText, '```') !== false) {
+        $responseText = preg_replace('/```\s*|\s*```/', '', $responseText);
+    }
+    
+    $responseText = trim($responseText);
+    
     // Parse the structured JSON response from AI
-    $triageResponse = json_decode(trim($geminiResponse['text']), true);
+    $triageResponse = json_decode($responseText, true);
     
     // Validate JSON parsing
     if (!$triageResponse) {
-        throw new Exception('Invalid JSON response from AI model: ' . $geminiResponse['text']);
+        throw new Exception('Invalid JSON response from AI model: ' . $responseText);
     }
     
     // Extract the user-facing response message
