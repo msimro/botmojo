@@ -28,6 +28,22 @@ define('GEMINI_MODEL', 'gemini-1.5-flash');            // AI model version (fast
 define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/' . GEMINI_MODEL . ':generateContent');
 
 // =============================================================================
+// EXTERNAL API CONFIGURATIONS
+// =============================================================================
+// OpenWeatherMap API for weather information
+// Get your free API key at: https://openweathermap.org/api
+define('OPENWEATHER_API_KEY', 'f526963b95687d981c884d6788c4a20a');  // Updated API key for testing
+
+// Google Custom Search API for web search capabilities
+// Get your API key from Google Cloud Console: https://console.cloud.google.com/
+// Create a Programmable Search Engine: https://programmablesearchengine.google.com/
+define('GOOGLE_SEARCH_API_KEY', 'AIzaSyBOhXuuQHXKReMfwNCzK0Vo8EojYY10GgQ'); // API key provided for testing
+define('GOOGLE_SEARCH_CX', '667d50a04bb4c49e3');      // Programmable Search Engine ID
+
+// Default timezone for calendar and date operations
+define('DEFAULT_TIMEZONE', 'America/New_York');  // Change to your preferred timezone
+
+// =============================================================================
 // APPLICATION CONFIGURATION
 // =============================================================================
 // Core application settings and directory paths
