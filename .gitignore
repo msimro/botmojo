@@ -2,3 +2,5 @@
 .ddev
 .ddev/
 .ddev/*
+.vscode
+.idea

@@ -1,3 +1,0 @@
-[
-  { "eventId": "uuid-event-001", "name": "Project Phoenix Launch", "type": "work", "dateRange": { "end": "2023-06-30" }, "involvedPeopleIds": ["uuid-person-001", "uuid-person-002"], "relatedOrgId": "uuid-org-001", "outcome": "Successful launch, 15% user growth in Q3" }
-]

@@ -1,5 +1,0 @@
-[
-  { "personId": "uuid-person-001", "name": { "givenName": "Alex", "familyName": "Chen" } },
-  { "personId": "uuid-person-003", "name": { "givenName": "Sandeep", "familyName": "Singh" } },
-  { "personId": "uuid-person-002", "name": { "givenName": "Maria", "familyName": "Garcia" }, "contactInfo": { "primaryEmail": "m.garcia@workplace.com" } }
-]
