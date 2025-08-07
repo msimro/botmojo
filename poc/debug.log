@@ -1,0 +1,41 @@
+2025-08-07 08:29:44 - User Input Received: My cat luna is not keeping well in terms of eating, what do i do? find me some good vets near me as well.
+2025-08-07 08:29:44 - --- Starting Gemini Call ---
+2025-08-07 08:29:44 - Payload Sent: {"contents":[{"parts":[{"text":"You are a Triage Agent for a highly intelligent personal assistant. Your primary goal is to analyze the user's raw text input and break it down into a structured JSON plan that the backend system can execute. You do not answer the user's question directly.\n\nAnalyze the user's input and respond with ONLY a valid JSON object following this exact structure:\n\n{\n  \"triage_summary\": \"A brief, one-sentence summary of the user's overall goal.\",\n  \"tasks\": [\n    {\n      \"task_id\": 1,\n      \"original_query_part\": \"The part of the user's query this task corresponds to.\",\n      \"intent\": \"The core verb of the task. Must be one of: CREATE, READ, UPDATE, DELETE, QUERY, CHAT.\",\n      \"required_domains\": [\"An array of data domains needed for context. Must be one or more of: PEOPLE, ORGANIZATIONS, EVENTS, CALENDAR, NOTES, GENERAL.\"],\n      \"response_type\": \"The final output format. Must be one of: TEXT_ONLY, ACTION_ONLY, TEXT_AND_ACTION.\",\n      \"parameters\": {\n        \"key\": \"value\" \/\/ Extracted entities and details from the query part.\n      }\n    }\n  ]\n}\n\n### Key Definitions:\n\n1.  **intent**:\n    - `CREATE`: User wants to add new information (e.g., \"My dad's name is...\").\n    - `READ`: User wants to retrieve a specific, known fact (e.g., \"What is my father's birthday?\").\n    - `UPDATE`: User wants to change existing information (e.g., \"Change my dad's name to...\").\n    - `QUERY`: User has a complex question that requires searching or combining data (e.g., \"Who in my contacts lives in California?\").\n    - `CHAT`: The request is a generic question or command that does not require personal data (e.g., \"What's the capital of France?\").\n\n2.  **required_domains**:\n    - `PEOPLE`: Information about contacts, family, relationships.\n    - `ORGANIZATIONS`: Companies, schools, etc.\n    - `EVENTS`: Projects, meetings, trips.\n    - `CALENDAR`: Schedules, appointments, dates.\n    - `NOTES`: General text notes or documents.\n    - `GENERAL`: For CHAT intent or when no specific domain applies.\n\n3.  **response_type**:\n    - `TEXT_ONLY`: A natural language answer is all that's needed.\n    - `ACTION_ONLY`: The system should only perform a background action (like saving data) and confirm with a simple \"Done.\"\n    - `TEXT_AND_ACTION`: The system must perform an action AND generate a detailed text response.\n\n### Examples:\n\nUser Input: \"My dad's name is msingh\"\nYour JSON Output:\n{\n  \"triage_summary\": \"User wants to add a new fact about their father.\",\n  \"tasks\": [\n    {\n      \"task_id\": 1,\n      \"original_query_part\": \"My dad's name is msingh\",\n      \"intent\": \"CREATE\",\n      \"required_domains\": [\"PEOPLE\"],\n      \"response_type\": \"ACTION_ONLY\",\n      \"parameters\": { \"person_alias\": \"dad\", \"name\": \"msingh\" }\n    }\n  ]\n}\n\nUser Input: \"Remind me about dad's birthday and what's on my schedule for that day.\"\nYour JSON Output:\n{\n  \"triage_summary\": \"User wants to know their dad's birthday and see their schedule for that day.\",\n  \"tasks\": [\n    {\n      \"task_id\": 1,\n      \"original_query_part\": \"dad's birthday\",\n      \"intent\": \"READ\",\n      \"required_domains\": [\"PEOPLE\"],\n      \"response_type\": \"TEXT_AND_ACTION\",\n      \"parameters\": { \"person_alias\": \"dad\", \"attribute\": \"birthday\" }\n    },\n    {\n      \"task_id\": 2,\n      \"original_query_part\": \"what's on my schedule for that day\",\n      \"intent\": \"READ\",\n      \"required_domains\": [\"CALENDAR\"],\n      \"response_type\": \"TEXT_AND_ACTION\",\n      \"parameters\": { \"date_reference\": \"task_1_result\" }\n    }\n  ]\n}\n\nUser Input: \"What's the weather like in Tokyo?\"\nYour JSON Output:\n{\n  \"triage_summary\": \"User is asking a generic question about the weather.\",\n  \"tasks\": [\n    {\n      \"task_id\": 1,\n      \"original_query_part\": \"What's the weather like in Tokyo?\",\n      \"intent\": \"CHAT\",\n      \"required_domains\": [\"GENERAL\"],\n      \"response_type\": \"TEXT_ONLY\",\n      \"parameters\": {}\n    }\n  ]\n}\n\nNow, analyze the following user input.\n\nUser Input: \"My cat luna is not keeping well in terms of eating, what do i do? find me some good vets near me as well.\""}]}],"generationConfig":{"responseMimeType":"application\/json"}}
+2025-08-07 08:29:46 - Raw Response from Gemini: {
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "{\"triage_summary\": \"The user needs advice on how to care for their sick cat and wants to find nearby veterinary clinics.\", \"tasks\": [{\"task_id\": 1, \"original_query_part\": \"My cat luna is not keeping well in terms of eating, what do i do?\", \"intent\": \"QUERY\", \"required_domains\": [\"GENERAL\"], \"response_type\": \"TEXT_ONLY\", \"parameters\": {\"pet_name\": \"luna\", \"symptom\": \"not keeping well in terms of eating\"}}, {\"task_id\": 2, \"original_query_part\": \"find me some good vets near me as well\", \"intent\": \"QUERY\", \"required_domains\": [\"GENERAL\"], \"response_type\": \"TEXT_ONLY\", \"parameters\": {}}]}"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.032306026844751271
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 1151,
+    "candidatesTokenCount": 168,
+    "totalTokenCount": 1319,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 1151
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 168
+      }
+    ]
+  },
+  "modelVersion": "gemini-1.5-flash",
+  "responseId": "OJyUaOrINb68gLUPiKvK2Aw"
+}
+
+2025-08-07 08:29:46 - Extracted Triage JSON Text: {"triage_summary": "The user needs advice on how to care for their sick cat and wants to find nearby veterinary clinics.", "tasks": [{"task_id": 1, "original_query_part": "My cat luna is not keeping well in terms of eating, what do i do?", "intent": "QUERY", "required_domains": ["GENERAL"], "response_type": "TEXT_ONLY", "parameters": {"pet_name": "luna", "symptom": "not keeping well in terms of eating"}}, {"task_id": 2, "original_query_part": "find me some good vets near me as well", "intent": "QUERY", "required_domains": ["GENERAL"], "response_type": "TEXT_ONLY", "parameters": {}}]}
+2025-08-07 08:29:46 - Successfully decoded execution plan.
