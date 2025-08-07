@@ -4,3 +4,8 @@
 .ddev/*
 .vscode
 .idea
+
+# Cache directory - contains conversation history files
+cache/
+cache/*
+*.json
