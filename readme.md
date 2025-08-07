@@ -239,5 +239,3 @@ This file is the main entry point. It coordinates the tools and agents to proces
 // 10. Use ConversationCache to save the current turn
 // 11. Send the final JSON response (including 'suggested_response') to the frontend.
 ```
-
-This brief should give your IDE copilot all the necessary context to understand our project's architecture, data structures, and overall flow, enabling it to provide relevant and accurate code suggestions.
