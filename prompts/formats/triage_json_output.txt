@@ -1,0 +1,19 @@
+Respond with ONLY a valid JSON object following this exact structure.
+
+{
+  "triage_summary": "A brief, one-sentence summary of the user's overall goal.",
+  "suggested_response": "A brief, friendly, and natural confirmation message for the user, written in the first person as the assistant.",
+  "target_entity": {
+    "alias": "A temporary name for the entity being discussed, e.g., 'the dinner event'.",
+    "type": "The entity type, e.g., 'event', 'person', 'task'."
+  },
+  "component_tasks": [
+    {
+      "task_id": 1,
+      "original_query_part": "The part of the query this task corresponds to.",
+      "target_agent": "The agent responsible for creating the component (e.g., 'FinanceAgent').",
+      "component_name": "The name of the component this agent will create (e.g., 'finance_component').",
+      "component_data": { "key": "value" }
+    }
+  ]
+}

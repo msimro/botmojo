@@ -1,0 +1,218 @@
+<?php
+/**
+ * API Orchestrator - Main Entry Point for AI Personal Assistant
+ * 
+ * This file serves as the central orchestrator for the AI Personal Assistant.
+ * It implements the triage-first, agent-based architecture by:
+ * 1. Receiving user queries via HTTP POST
+ * 2. Using AI to analyze and create execution plans
+ * 3. Routing tasks to specialized agents
+ * 4. Assembling components into unified entities
+ * 5. Storing results in the database
+ * 6. Managing conversation history
+ * 
+ * @author AI Personal Assistant Team
+ * @version 1.0
+ * @since 2025-08-07
+ */
+
+// Load configuration and initialize autoloader
+require_once 'config.php';
+
+// =============================================================================
+// HTTP HEADERS AND CORS SETUP
+// =============================================================================
+// Set appropriate headers for JSON API responses and CORS support
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+
+// Handle preflight CORS requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
+
+try {
+    // =============================================================================
+    // INPUT VALIDATION AND SETUP
+    // =============================================================================
+    
+    // Parse incoming JSON request
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    // Validate required input parameters
+    if (!$input || !isset($input['query'])) {
+        throw new Exception('Invalid input. Query is required.');
+    }
+    
+    // Extract and sanitize input parameters
+    $userQuery = trim($input['query']);
+    $conversationId = $input['conversation_id'] ?? 'default_conversation';
+    $userId = DEFAULT_USER_ID;
+    
+    // Ensure query is not empty
+    if (empty($userQuery)) {
+        throw new Exception('Query cannot be empty.');
+    }
+    
+    // =============================================================================
+    // TOOL INITIALIZATION
+    // =============================================================================
+    
+    // Initialize core tools for processing
+    $promptBuilder = new PromptBuilder(PROMPTS_DIR);          // For dynamic prompt assembly
+    $conversationCache = new ConversationCache(CACHE_DIR);    // For conversation history
+    $databaseTool = new DatabaseTool();                       // For entity storage
+    
+    // =============================================================================
+    // TRIAGE PHASE - AI ANALYSIS AND PLANNING
+    // =============================================================================
+    
+    // Retrieve conversation history for context
+    $conversationHistory = $conversationCache->getHistory($conversationId);
+    
+    // Build the triage prompt using dynamic template assembly
+    $triagePrompt = $promptBuilder->build('base/triage_agent_base.txt', [
+        'conversation_history' => $conversationHistory,
+        'agent_definitions' => 'components/agent_definitions.txt',
+        'output_format' => 'formats/triage_json_output.txt'
+    ]);
+    
+    // Append the current user query to the prompt
+    $fullPrompt = $triagePrompt . "\n\nUser Input: " . $userQuery;
+    
+    // Send prompt to Gemini AI for triage analysis
+    $geminiResponse = callGeminiAPI($fullPrompt);
+    
+    // Validate AI response
+    if (!$geminiResponse || !isset($geminiResponse['text'])) {
+        throw new Exception('Failed to get response from AI model.');
+    }
+    
+    // Parse the structured JSON response from AI
+    $triageResponse = json_decode(trim($geminiResponse['text']), true);
+    
+    // Validate JSON parsing
+    if (!$triageResponse) {
+        throw new Exception('Invalid JSON response from AI model: ' . $geminiResponse['text']);
+    }
+    
+    // Extract the user-facing response message
+    $suggestedResponse = $triageResponse['suggested_response'] ?? 'I understand your request and will process it.';
+    
+    // =============================================================================
+    // COMPONENT PROCESSING - AGENT-BASED TASK EXECUTION
+    // =============================================================================
+    
+    // Initialize container for assembled components
+    $assembledComponents = [];
+    
+    // Process each component task assigned by the triage AI
+    if (isset($triageResponse['component_tasks']) && is_array($triageResponse['component_tasks'])) {
+        foreach ($triageResponse['component_tasks'] as $task) {
+            // Extract task details
+            $targetAgent = $task['target_agent'] ?? '';
+            $componentName = $task['component_name'] ?? '';
+            $componentData = $task['component_data'] ?? [];
+            
+            // Route to appropriate specialized agent
+            switch ($targetAgent) {
+                case 'FinanceAgent':
+                    $agent = new FinanceAgent();
+                    break;
+                case 'MemoryAgent':
+                    $agent = new MemoryAgent();
+                    break;
+                case 'PlannerAgent':
+                    $agent = new PlannerAgent();
+                    break;
+                case 'GeneralistAgent':
+                    $agent = new GeneralistAgent();
+                    break;
+                default:
+                    // Fallback to GeneralistAgent for unknown agent types
+                    $agent = new GeneralistAgent();
+                    $componentName = 'general_component';
+                    break;
+            }
+            
+            // Create component using the selected agent
+            if ($agent && method_exists($agent, 'createComponent')) {
+                $assembledComponents[$componentName] = $agent->createComponent($componentData);
+            }
+        }
+    }
+    
+    // =============================================================================
+    // ENTITY STORAGE - DATABASE PERSISTENCE
+    // =============================================================================
+    
+    // Save entity to database if we have components or target entity information
+    if (!empty($assembledComponents) || isset($triageResponse['target_entity'])) {
+        // Generate unique identifier for the new entity
+        $entityId = generateUUID();
+        $entityType = $triageResponse['target_entity']['type'] ?? 'general';
+        $entityName = $triageResponse['target_entity']['alias'] ?? 'Untitled Entity';
+        
+        // Create the comprehensive entity data structure
+        $entityData = [
+            'triage_summary' => $triageResponse['triage_summary'] ?? '',   // AI's understanding summary
+            'original_query' => $userQuery,                                // User's original input
+            'components' => $assembledComponents,                          // All agent-created components
+            'created_at' => date('Y-m-d H:i:s'),                          // Creation timestamp
+            'conversation_id' => $conversationId                          // Link to conversation
+        ];
+        
+        // Persist entity to database
+        $saved = $databaseTool->saveNewEntity(
+            $entityId,
+            $userId,
+            $entityType,
+            $entityName,
+            json_encode($entityData)
+        );
+        
+        // Log any database save failures
+        if (!$saved) {
+            error_log("Failed to save entity to database");
+        }
+    }
+    
+    // =============================================================================
+    // CONVERSATION HISTORY - CACHE UPDATE
+    // =============================================================================
+    
+    // Save this conversation turn to history cache
+    $conversationCache->appendToHistory($conversationId, $userQuery, $suggestedResponse);
+    
+    // =============================================================================
+    // RESPONSE GENERATION - SUCCESS OUTPUT
+    // =============================================================================
+    
+    // Return successful response with user-facing message
+    echo json_encode([
+        'success' => true,
+        'response' => $suggestedResponse,
+        'triage_data' => DEBUG_MODE ? $triageResponse : null, // Include debug data in development
+        'timestamp' => date('Y-m-d H:i:s')
+    ]);
+    
+} catch (Exception $e) {
+    // =============================================================================
+    // ERROR HANDLING - FAILURE RESPONSE
+    // =============================================================================
+    
+    // Set HTTP error status code
+    http_response_code(500);
+    
+    // Return structured error response
+    echo json_encode([
+        'success' => false,
+        'error' => $e->getMessage(),
+        'timestamp' => date('Y-m-d H:i:s')
+    ]);
+    
+    // Log the error for debugging and monitoring
+    error_log("API Error: " . $e->getMessage());
+}
