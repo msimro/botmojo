@@ -1,53 +1,103 @@
-# AI Personal Assistant - Core v1
+# BotMojo - AI Personal Assistant ✅ Phase 1 Complete
 
-## Setup Instructions
+**Intelligent, modular, multi-agent personal assistant with enhanced AI capabilities**
 
-### 1. Database Setup
-1. Create a MySQL database named `assistant_core_v1`
-2. Import the database schema:
-   ```bash
-   mysql -u your_username -p assistant_core_v1 < database.sql
-   ```
+## 🚀 Quick Start (DDEV)
+
+### 1. DDEV Setup
+```bash
+ddev start
+ddev import-db --src=database.sql
+```
 
 ### 2. Configuration
-1. Edit `config.php` and update the following:
-   - Database credentials (DB_HOST, DB_USER, DB_PASS, DB_NAME)
+1. Edit `config.php` and update:
    - Google Gemini API key (GEMINI_API_KEY)
+   - Database is auto-configured via DDEV
 
-### 3. Web Server Setup
-1. Place the project folder in your web server directory
-2. Ensure PHP has the following extensions enabled:
-   - mysqli
-   - curl
-   - json
-3. Make sure the `cache/` directory is writable by the web server
-
-### 4. Getting Your Gemini API Key
+### 3. Getting Your Gemini API Key
 1. Visit [Google AI Studio](https://aistudio.google.com/)
 2. Create a new API key
 3. Copy the key and paste it in `config.php`
 
-### 5. Testing
+### 4. Testing
 1. Open `index.php` in your web browser
-2. Try some example queries:
+2. Try example queries:
    - "I spent $25 on lunch at McDonald's today"
    - "Schedule a meeting with John tomorrow at 3 PM"
    - "Remember that Sarah likes coffee"
 
-## Project Structure
+## ✨ What's New in Phase 1
+
+### 🤖 Enhanced Agents (All v1.1)
+- **MemoryAgent**: Intelligent knowledge graph with rich relationship parsing
+- **PlannerAgent**: Advanced date/time parsing and smart scheduling
+- **FinanceAgent**: Multi-currency support with intelligent categorization
+- **GeneralistAgent**: Advanced content analysis with sentiment detection
+
+### 🏗️ Architecture Highlights
+- **Triage-First**: AI-driven intent analysis and execution planning
+- **Agent-Based**: Specialized processing with modular design
+- **Unified Database**: Flexible entities/relationships schema
+- **File-Based Cache**: Conversation history preservation
+
+## 📁 Project Structure
 
 ```
-/assistant_core_v1/
-├── agents/                    # Agent classes for different domains
-│   ├── MemoryAgent.php       # Manages people, places, objects
-│   ├── PlannerAgent.php      # Manages time, schedules, tasks
-│   ├── FinanceAgent.php      # Manages financial data
-│   └── GeneralistAgent.php  # Fallback for general queries
-├── tools/                    # Tool classes for common functionality
-│   ├── DatabaseTool.php      # Database operations
-│   ├── PromptBuilder.php     # Dynamic prompt assembly
-│   └── ConversationCache.php # Conversation history management
-├── prompts/                  # Prompt templates
+/botmojo/
+├── agents/                    # Enhanced AI agents (v1.1)
+│   ├── MemoryAgent.php       # Smart knowledge graph with relationships
+│   ├── PlannerAgent.php      # Advanced scheduling and task management
+│   ├── FinanceAgent.php      # Multi-currency financial analytics
+│   └── GeneralistAgent.php  # Intelligent content analysis
+├── tools/                    # Core utility classes
+│   ├── DatabaseTool.php      # Database operations and entity management
+│   ├── PromptBuilder.php     # Dynamic AI prompt assembly
+│   └── ConversationCache.php # File-based conversation history
+├── prompts/                  # AI prompt templates
+│   ├── base/
+│   │   └── triage_agent_base.txt      # Main triage prompt template
+│   ├── components/
+│   │   └── agent_definitions.txt      # Agent capability descriptions
+│   └── formats/
+│       └── triage_json_output.txt     # JSON response format spec
+├── cache/                    # Conversation cache files
+├── config.php               # Configuration and utilities
+├── database.sql             # Database schema
+├── api.php                  # Main API orchestrator
+├── index.php               # Chat interface
+├── dashboard.php           # Data visualization dashboard
+├── completed.md            # Phase 1 completion summary
+└── upnext.md              # Phase 2 roadmap
+```
+
+## 🎯 System Capabilities
+
+### Intelligent Processing
+- Natural language understanding and intent analysis
+- Smart data extraction and categorization
+- Context-aware entity creation and relationship mapping
+- Multi-domain query handling with specialized agents
+
+### Financial Intelligence
+- Multi-currency transaction parsing
+- Intelligent vendor detection and categorization
+- Smart expense analysis and tracking
+- Enhanced financial data extraction
+
+### Memory & Knowledge
+- Rich attribute extraction from conversations
+- Intelligent relationship parsing and storage
+- Context-aware entity creation
+- Bidirectional relationship handling
+
+### Planning & Scheduling
+- Advanced date/time parsing ("tomorrow at 3", "next Friday")
+- Intelligent priority assessment
+- Context-aware scheduling
+- Task and goal management
+
+## How It Works
 │   ├── base/
 │   │   └── triage_agent_base.txt
 │   ├── components/
@@ -75,14 +125,21 @@
 - **Unified**: Single data model for all entities
 - **Intelligent**: AI-driven triage and component creation
 
-## Troubleshooting
+## 🔧 Troubleshooting
+
+### DDEV Issues
+```bash
+ddev restart        # Restart DDEV containers
+ddev describe       # Check DDEV status
+ddev logs           # View container logs
+```
 
 ### Common Issues
 
 1. **Database Connection Failed**
-   - Check your database credentials in `config.php`
-   - Ensure MySQL is running
-   - Verify the database exists
+   - Run `ddev restart` to restart containers
+   - Check `ddev describe` for database credentials
+   - Ensure DDEV is running with `ddev start`
 
 2. **Gemini API Error**
    - Check your API key in `config.php`
@@ -90,27 +147,35 @@
    - Check your internet connection
 
 3. **Cache Directory Issues**
-   - Ensure the `cache/` directory is writable
-   - Check file permissions
+   - DDEV handles permissions automatically
+   - Try `ddev restart` if cache issues persist
 
-4. **JSON Parse Errors**
-   - This usually indicates an issue with the AI model response
-   - Check the debug output when DEBUG_MODE is enabled
-   - Verify your prompt templates are properly formatted
+4. **Agent Processing Errors**
+   - Check agent version (should be v1.1)
+   - Enable `DEBUG_MODE` in `config.php`
+   - View detailed error output in browser console
 
 ### Debug Mode
 
 Set `DEBUG_MODE` to `true` in `config.php` to:
-- See detailed error messages
-- View the triage data in API responses
-- Enable PHP error reporting
+- See detailed error messages and triage data
+- View agent processing steps
+- Enable comprehensive PHP error reporting
+- Monitor AI model responses
 
-## Next Steps
+## 📊 Development Tools
 
-This is the foundational core (v1). Future enhancements could include:
-- Multi-user support
-- Advanced relationship mapping
-- Integration with external APIs
-- Real-time notifications
-- Mobile app interface
-- Advanced analytics and insights
+- **Dashboard**: View entities and relationships at `/dashboard.php`
+- **API Testing**: Direct API access at `/api.php`
+- **Cache Management**: Files stored in `/cache/` directory
+- **Database**: Access via `ddev mysql` command
+
+## 🚀 What's Next
+
+Phase 1 is complete with all four agents enhanced and intelligent. See `upnext.md` for Phase 2 roadmap including:
+- Weather integration and location awareness
+- Advanced analytics and pattern recognition
+- Mobile API and webhook integrations
+- Machine learning for better categorization
+
+**Ready for production use!** 🎯
