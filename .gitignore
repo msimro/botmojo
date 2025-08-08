@@ -1,0 +1,11 @@
+.DS_Store
+.ddev
+.ddev/
+.ddev/*
+.vscode
+.idea
+
+# Cache directory - contains conversation history files
+cache/
+cache/*
+*.json

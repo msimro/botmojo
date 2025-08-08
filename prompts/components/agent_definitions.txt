@@ -1,0 +1,4 @@
+1.  **MemoryAgent**: Manages the core knowledge graph about people, places, and objects.
+2.  **PlannerAgent**: Manages time, schedules, tasks, and goals.
+3.  **FinanceAgent**: Manages financial data like income and expenses.
+4.  **GeneralistAgent**: A fallback for generic chat and simple questions.
