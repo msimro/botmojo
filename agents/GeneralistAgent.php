@@ -628,9 +628,23 @@ class GeneralistAgent {
                 $weatherTool = $this->toolManager->getTool('weather', 'GeneralistAgent');
                 $location = $this->extractLocation($text);
                 
+                if (DEBUG_MODE) {
+                    error_log("Weather query detected: " . $text);
+                    error_log("Extracted location: " . ($location ?: 'None'));
+                }
+                
                 if ($weatherTool && $location) {
+                    if (DEBUG_MODE) {
+                        error_log("Getting weather for location: " . $location);
+                    }
+                    
                     $weather = $weatherTool->getCurrentWeather($location);
                     $forecast = $weatherTool->getForecast($location, 3);
+                    
+                    if (DEBUG_MODE) {
+                        error_log("Weather data received: " . ($weather ? 'Yes' : 'No'));
+                        error_log("Forecast data received: " . ($forecast ? 'Yes' : 'No'));
+                    }
                     
                     $enhanced['tool_insights']['weather'] = [
                         'current' => $weather ? [
@@ -644,6 +658,10 @@ class GeneralistAgent {
                         ] : null,
                         'insights' => $location ? $weatherTool->getWeatherInsights($location) : null
                     ];
+                    
+                    if (DEBUG_MODE) {
+                        error_log("Weather insights added to response");
+                    }
                 }
             }
             
@@ -766,7 +784,13 @@ class GeneralistAgent {
      * @return bool True if weather related
      */
     private function isWeatherRelated(string $text): bool {
-        return preg_match('/\b(?:weather|forecast|temperature|rain|snow|sunny|cloudy|storm|precipitation|humidity|wind)\b/i', $text) === 1;
+        // Check for weather terms
+        $weatherTerms = '/\b(?:weather|forecast|temperature|rain|snow|sunny|cloudy|storm|precipitation|humidity|wind|hot|cold|warm|cool|climate|conditions|sky|meteorolog|degree|celsius|fahrenheit)\b/i';
+        
+        // Check for phrases like "How's the weather"
+        $weatherPhrases = '/\b(?:how\'?s\s+(?:the|it)\s+(?:weather|looking)|what\'?s\s+(?:the|it)\s+(?:weather|like)|tell\s+me\s+(?:about|the)\s+weather)\b/i';
+        
+        return preg_match($weatherTerms, $text) === 1 || preg_match($weatherPhrases, $text) === 1;
     }
     
     /**
@@ -799,12 +823,30 @@ class GeneralistAgent {
         $locations = [];
         
         // Try to find "in [Location]" pattern
-        if (preg_match('/\b(?:in|at|for|near)\s+([A-Z][a-zA-Z\s]{2,})\b/i', $text, $matches)) {
+        if (preg_match('/\b(?:in|at|for|near)\s+([A-Za-z][a-zA-Z\s]{1,}(?:downtown|uptown|city center)?)\b/i', $text, $matches)) {
             $locations[] = trim($matches[1]);
         }
         
+        // Look for locations with abbreviations like NY, LA, etc.
+        if (preg_match('/\b([A-Z]{2})\s+(?:downtown|uptown|city center|city)\b/i', $text, $matches)) {
+            $stateAbbr = [
+                'NY' => 'New York',
+                'LA' => 'Los Angeles',
+                'SF' => 'San Francisco',
+                'DC' => 'Washington DC',
+                'CHI' => 'Chicago'
+            ];
+            
+            $abbr = strtoupper($matches[1]);
+            if (isset($stateAbbr[$abbr])) {
+                $locations[] = $stateAbbr[$abbr];
+            } else {
+                $locations[] = $abbr;
+            }
+        }
+        
         // Look for capitalized places
-        if (preg_match_all('/\b([A-Z][a-zA-Z]{3,}(?:\s+[A-Z][a-zA-Z]{1,})?)\b/', $text, $matches)) {
+        if (preg_match_all('/\b([A-Z][a-zA-Z]{2,}(?:\s+[A-Z][a-zA-Z]{1,})?)\b/', $text, $matches)) {
             foreach ($matches[1] as $match) {
                 if (!preg_match('/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December)\b/', $match)) {
                     $locations[] = $match;
@@ -812,6 +854,6 @@ class GeneralistAgent {
             }
         }
         
-        return !empty($locations) ? $locations[0] : null;
+        return !empty($locations) ? $locations[0] : 'New York'; // Default to New York if no location found
     }
 }

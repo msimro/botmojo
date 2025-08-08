@@ -55,7 +55,7 @@ define('PROMPTS_DIR', __DIR__ . '/prompts');     // AI prompt templates director
 // DEVELOPMENT & DEBUGGING SETTINGS
 // =============================================================================
 // Error reporting configuration (set to false in production)
-define('DEBUG_MODE', false);  // Disable detailed error reporting and debug output for production
+define('DEBUG_MODE', true);  // Enable detailed error reporting and debug output for debugging
 
 // Configure PHP error reporting based on debug mode
 if (DEBUG_MODE) {

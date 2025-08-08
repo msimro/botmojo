@@ -21,13 +21,28 @@ function extractWeatherResponse(array $components): ?string {
         if (!empty($component['tool_insights']['weather'])) {
             $weatherData = $component['tool_insights']['weather'];
             
+            if (DEBUG_MODE) {
+                error_log("Weather data found in components: " . json_encode($weatherData));
+            }
+            
             // Skip if no current weather or if using mock data
-            if (empty($weatherData['current']) || isset($weatherData['current']['note'])) {
+            if (empty($weatherData['current'])) {
+                if (DEBUG_MODE) {
+                    error_log("Weather data missing current weather");
+                }
+                continue;
+            }
+            
+            // Skip if mock data with note present (but check for that field first)
+            if (isset($weatherData['current']['note'])) {
+                if (DEBUG_MODE) {
+                    error_log("Weather data is mock data, skipping");
+                }
                 continue;
             }
             
             // Format current weather information
-            $response = " The current weather in {$weatherData['forecast']['location']} is " . 
+            $response = "The current weather in {$weatherData['forecast']['location']} is " . 
                        "{$weatherData['current']['description']} with a temperature of " .
                        "{$weatherData['current']['temperature']} and " .
                        "{$weatherData['current']['humidity']} humidity.";
@@ -45,8 +60,16 @@ function extractWeatherResponse(array $components): ?string {
                 $response .= " Recommendations: " . implode('. ', $weatherData['insights']['recommendations']) . ".";
             }
             
+            if (DEBUG_MODE) {
+                error_log("Weather response generated: " . $response);
+            }
+            
             return $response;
         }
+    }
+    
+    if (DEBUG_MODE) {
+        error_log("No valid weather data found in components");
     }
     
     return null;
@@ -151,36 +174,43 @@ function extractCalendarResponse(array $components): ?string {
  * @return string Enhanced response with tool data
  */
 function enhanceResponseWithToolData(string $baseResponse, array $components, string $originalQuery = ''): string {
-    $enhancedResponse = $baseResponse;
-    
     // Determine intent of the query
     $isWeatherQuery = preg_match('/\b(?:weather|forecast|temperature|rain|snow|sunny|cloudy|storm|precipitation|humidity|wind)\b/i', $originalQuery) === 1;
     $isCalendarQuery = preg_match('/\b(?:date|day|time|schedule|when|today|tomorrow|yesterday|next|week|month|year|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i', $originalQuery) === 1;
     $isSearchQuery = !$isWeatherQuery && !$isCalendarQuery;
     
-    // Add calendar data if available and this is a calendar-related query
+    // For weather queries, replace the entire response with just the weather data
+    if ($isWeatherQuery) {
+        $weatherResponse = extractWeatherResponse($components);
+        if ($weatherResponse && trim($weatherResponse) !== '') {
+            return "I've checked the weather for you. " . trim($weatherResponse);
+        }
+    }
+    
+    // For calendar queries, replace the entire response with just the calendar data
+    if ($isCalendarQuery) {
+        $calendarResponse = extractCalendarResponse($components);
+        if ($calendarResponse && trim($calendarResponse) !== '') {
+            return "Here's the date information you requested. " . trim($calendarResponse);
+        }
+    }
+    
+    // For other queries, start with the base response
+    $enhancedResponse = $baseResponse;
+    
+    // Add calendar data if available
     $calendarResponse = extractCalendarResponse($components);
     if ($calendarResponse) {
         $enhancedResponse .= $calendarResponse;
-        
-        // If this is primarily a calendar query, return here
-        if ($isCalendarQuery && trim($calendarResponse) !== '') {
-            return $enhancedResponse;
-        }
     }
     
-    // Add weather data if available and either this is a weather query or not a calendar query
+    // Add weather data if available
     $weatherResponse = extractWeatherResponse($components);
-    if ($weatherResponse && ($isWeatherQuery || !$isCalendarQuery)) {
+    if ($weatherResponse) {
         $enhancedResponse .= $weatherResponse;
-        
-        // If this is primarily a weather query, return here
-        if ($isWeatherQuery && trim($weatherResponse) !== '') {
-            return $enhancedResponse;
-        }
     }
     
-    // Add search data if available and this is likely a search query
+    // Add search data if available
     $searchResponse = extractSearchResponse($components);
     if ($searchResponse && $isSearchQuery) {
         $enhancedResponse .= $searchResponse;

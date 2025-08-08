@@ -91,6 +91,17 @@ class ToolManager {
         }
         
         try {
+            // Prepare constructor parameters for specific tools
+            if ($toolName === 'weather' && empty($constructorParams)) {
+                // Pass the OpenWeatherMap API key for weather tool
+                $constructorParams = [defined('OPENWEATHER_API_KEY') ? OPENWEATHER_API_KEY : ''];
+            } else if ($toolName === 'search' && empty($constructorParams)) {
+                // Pass Google Search API keys
+                $apiKey = defined('GOOGLE_SEARCH_API_KEY') ? GOOGLE_SEARCH_API_KEY : '';
+                $searchEngineId = defined('GOOGLE_SEARCH_CX') ? GOOGLE_SEARCH_CX : '';
+                $constructorParams = [$apiKey, $searchEngineId];
+            }
+            
             // Create instance with provided constructor parameters
             if (empty($constructorParams)) {
                 $instance = new $className();
