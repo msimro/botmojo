@@ -12,6 +12,17 @@
  * @since 2025-08-07
  */
 class FinanceAgent {
+    /** @var ToolManager Tool access manager */
+    private ToolManager $toolManager;
+    
+    /**
+     * Constructor - Initialize with tool manager for controlled tool access
+     * 
+     * @param ToolManager $toolManager Tool management service
+     */
+    public function __construct(ToolManager $toolManager) {
+        $this->toolManager = $toolManager;
+    }
     
     /**
      * Create a financial component from provided data

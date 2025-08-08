@@ -1,10 +1,12 @@
 <?php
 /**
- * WeatherTool - Weather Information Service
+ * WeatherTool - Weather Information and Forecasting
  * 
- * This tool provides weather information using the OpenWeatherMap API.
- * It can fetch current weather, forecasts, and weather-related insights
- * for location-based queries and planning assistance.
+ * This tool provides weather information, forecasts, and insights
+ * using the OpenWeatherMap API.
+ * 
+ * Updated for production: August 8, 2025
+ * Features: Current weather, forecasts, and weather recommendations
  * 
  * @author AI Personal Assistant Team
  * @version 1.0

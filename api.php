@@ -77,6 +77,9 @@ try {
     $conversationCache = new ConversationCache(CACHE_DIR);    // For conversation history
     $databaseTool = new DatabaseTool();                       // For entity storage
     
+    // Initialize Tool Manager for centralized tool access
+    $toolManager = new ToolManager();
+    
     // =============================================================================
     // TRIAGE PHASE - AI ANALYSIS AND PLANNING
     // =============================================================================
@@ -147,20 +150,20 @@ try {
             // Route to appropriate specialized agent
             switch ($targetAgent) {
                 case 'FinanceAgent':
-                    $agent = new FinanceAgent();
+                    $agent = new FinanceAgent($toolManager);
                     break;
                 case 'MemoryAgent':
-                    $agent = new MemoryAgent();
+                    $agent = new MemoryAgent($toolManager);
                     break;
                 case 'PlannerAgent':
-                    $agent = new PlannerAgent();
+                    $agent = new PlannerAgent($toolManager);
                     break;
                 case 'GeneralistAgent':
-                    $agent = new GeneralistAgent();
+                    $agent = new GeneralistAgent($toolManager);
                     break;
                 default:
                     // Fallback to GeneralistAgent for unknown agent types
-                    $agent = new GeneralistAgent();
+                    $agent = new GeneralistAgent($toolManager);
                     $componentName = 'general_component';
                     break;
             }
@@ -226,13 +229,31 @@ try {
     // RESPONSE GENERATION - SUCCESS OUTPUT
     // =============================================================================
     
-    // Return successful response with user-facing message
-    echo json_encode([
+    // Include tool response handler
+    require_once 'tools/ToolResponseHandler.php';
+    
+    // Enhance the response with all tool data from all components
+    $enhancedResponse = enhanceResponseWithToolData($suggestedResponse, $assembledComponents, $userQuery);
+    
+    // Return successful response with enhanced message
+    $responseData = [
         'success' => true,
-        'response' => $suggestedResponse,
-        'triage_data' => DEBUG_MODE ? $triageResponse : null, // Include debug data in development
+        'response' => $enhancedResponse,
         'timestamp' => date('Y-m-d H:i:s')
-    ]);
+    ];
+    
+    // Include debug data if in development mode
+    if (DEBUG_MODE) {
+        $responseData['triage_data'] = $triageResponse;
+        $responseData['debug'] = [
+            'original_response' => $suggestedResponse,
+            'enhanced_response' => $enhancedResponse,
+            'has_weather_component' => !empty($assembledComponents['general_component']['tool_insights']['weather']),
+            'components' => array_keys($assembledComponents)
+        ];
+    }
+    
+    echo json_encode($responseData);
     
 } catch (Exception $e) {
     // =============================================================================

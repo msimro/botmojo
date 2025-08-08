@@ -7,11 +7,26 @@
  * agent categories. It provides contextual analysis, topic classification,
  * and intelligent response generation.
  * 
+ * Updated for production: August 8, 2025
+ * Features: Tool Manager integration for better tool coordination
+ * 
  * @author AI Personal Assistant Team
- * @version 1.1
+ * @version 1.2
  * @since 2025-08-07
  */
 class GeneralistAgent {
+    
+    /** @var ToolManager Tool access manager */
+    private ToolManager $toolManager;
+    
+    /**
+     * Constructor - Initialize with tool manager for controlled tool access
+     * 
+     * @param ToolManager $toolManager Tool management service
+     */
+    public function __construct(ToolManager $toolManager) {
+        $this->toolManager = $toolManager;
+    }
     
     /**
      * Create a general-purpose component from provided data
@@ -24,34 +39,40 @@ class GeneralistAgent {
         // Extract enhanced information from triage context
         $extractedInfo = $this->extractGeneralInformation($data);
         
+        // Enhance with tools (Weather, Calendar, Search)
+        $enhancedInfo = $this->enhanceWithTools($extractedInfo, $data);
+        
         return [
             // Core content information (enhanced)
-            'content' => $this->generateContent($extractedInfo, $data),
-            'type' => $this->determineContentType($extractedInfo, $data),
-            'topic' => $this->classifyTopic($extractedInfo, $data),
-            'subtopics' => $extractedInfo['subtopics'] ?? [],
+            'content' => $this->generateContent($enhancedInfo, $data),
+            'type' => $this->determineContentType($enhancedInfo, $data),
+            'topic' => $this->classifyTopic($enhancedInfo, $data),
+            'subtopics' => $enhancedInfo['subtopics'] ?? [],
             
             // Enhanced contextual analysis
-            'context' => $this->generateContext($extractedInfo, $data),
-            'intent_analysis' => $extractedInfo['intent'] ?? [],
-            'complexity_level' => $this->assessComplexity($extractedInfo),
-            'domain_expertise_required' => $extractedInfo['expertise_domains'] ?? [],
+            'context' => $this->generateContext($enhancedInfo, $data),
+            'intent_analysis' => $enhancedInfo['intent'] ?? [],
+            'complexity_level' => $this->assessComplexity($enhancedInfo),
+            'domain_expertise_required' => $enhancedInfo['expertise_domains'] ?? [],
             
             // Response strategy
-            'response_type' => $this->determineResponseType($extractedInfo, $data),
-            'suggested_actions' => $this->suggestActions($extractedInfo),
-            'followup_potential' => $extractedInfo['followup_potential'] ?? [],
+            'response_type' => $this->determineResponseType($enhancedInfo, $data),
+            'suggested_actions' => $this->suggestActions($enhancedInfo),
+            'followup_potential' => $enhancedInfo['followup_potential'] ?? [],
             
             // Intelligence metadata
-            'confidence_level' => $this->calculateConfidence($extractedInfo),
-            'processing_approach' => $extractedInfo['approach'] ?? 'conversational',
-            'key_entities' => $extractedInfo['entities'] ?? [],
-            'sentiment_analysis' => $extractedInfo['sentiment'] ?? 'neutral',
+            'confidence_level' => $this->calculateConfidence($enhancedInfo),
+            'processing_approach' => $enhancedInfo['approach'] ?? 'conversational',
+            'key_entities' => $enhancedInfo['entities'] ?? [],
+            'sentiment_analysis' => $enhancedInfo['sentiment'] ?? 'neutral',
+            'suggested_tags' => $enhancedInfo['tags'] ?? [],
             
             // Enhanced metadata
-            'natural_language_input' => $extractedInfo['original_text'] ?? '',
-            'parsing_details' => $extractedInfo['parsing_details'] ?? [],
-            'suggested_tags' => $extractedInfo['tags'] ?? []
+            'natural_language_input' => $enhancedInfo['original_text'] ?? '',
+            'parsing_details' => $enhancedInfo['parsing_details'] ?? [],
+            
+            // Tool insights
+            'tool_insights' => $enhancedInfo['tool_insights'] ?? []
         ];
     }
     
@@ -581,5 +602,216 @@ class GeneralistAgent {
         if ($confidence >= 0.8) return 'high';
         if ($confidence >= 0.6) return 'medium';
         return 'low';
+    }
+    
+    /**
+     * Enhance general information with tool insights
+     * Uses tools like Search, Weather, and Calendar to provide additional context
+     * 
+     * @param array $extractedInfo The information extracted from the triage data
+     * @param array $data The original triage data
+     * @return array Enhanced information with tool insights
+     */
+    private function enhanceWithTools(array $extractedInfo, array $data): array {
+        // Start with original extracted info
+        $enhanced = $extractedInfo;
+        $enhanced['tool_insights'] = [];
+        
+        try {
+            // Get main text to analyze
+            $text = $extractedInfo['original_text'] ?? ($data['original_query'] ?? '');
+            $topic = $extractedInfo['topic'] ?? '';
+            
+            // Check for weather-related queries
+            if ($this->isWeatherRelated($text)) {
+                // Get weather tool through ToolManager
+                $weatherTool = $this->toolManager->getTool('weather', 'GeneralistAgent');
+                $location = $this->extractLocation($text);
+                
+                if ($weatherTool && $location) {
+                    $weather = $weatherTool->getCurrentWeather($location);
+                    $forecast = $weatherTool->getForecast($location, 3);
+                    
+                    $enhanced['tool_insights']['weather'] = [
+                        'current' => $weather ? [
+                            'temperature' => $weather['temperature'] . '°C',
+                            'description' => $weather['description'],
+                            'humidity' => $weather['humidity'] . '%'
+                        ] : null,
+                        'forecast' => $forecast ? [
+                            'days' => array_slice($forecast['days'], 0, 3),
+                            'location' => $forecast['location']
+                        ] : null,
+                        'insights' => $location ? $weatherTool->getWeatherInsights($location) : null
+                    ];
+                }
+            }
+            
+            // Check for date/time queries
+            if ($this->isTimeRelated($text)) {
+                // Get calendar tool through ToolManager
+                $calendarTool = $this->toolManager->getTool('calendar', 'GeneralistAgent');
+                
+                if ($calendarTool) {
+                    // Extract date expressions
+                    $dateExpressions = [];
+                    if (preg_match_all('/\b(today|tomorrow|yesterday|next|last|this)\s+([a-zA-Z]+)\b|(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/', $text, $matches)) {
+                        foreach ($matches[0] as $expr) {
+                            $dateExpressions[] = $expr;
+                        }
+                    }
+                    
+                    // Check for date calculation requests
+                    $daysBetween = null;
+                    if (preg_match('/(?:days|time)\s+between\s+([^,]+?)\s+(?:and|to)\s+([^,]+)/i', $text, $matches)) {
+                        $date1 = trim($matches[1]);
+                        $date2 = trim($matches[2]);
+                        
+                        // Calculate days between these dates
+                        $daysBetween = $calendarTool->calculateDaysBetween($date1, $date2);
+                    }
+                    
+                    // Check for date info requests
+                    $dateInfo = null;
+                    if (preg_match('/(?:what|which|is)\s+(?:day|date)\s+(?:is|was|will be)\s+([^?]+)/i', $text, $matches)) {
+                        $date = trim($matches[1]);
+                        
+                        // Get date information
+                        $dateInfo = $calendarTool->getDateInfo($date);
+                    }
+                    
+                    $dateInsights = [];
+                    foreach ($dateExpressions as $expr) {
+                        $parsed = $calendarTool->parseNaturalDate($expr);
+                        if ($parsed['success']) {
+                            $dateInsights[] = [
+                                'expression' => $expr,
+                                'parsed_date' => $parsed['datetime'] ? $parsed['datetime']->format('F j, Y') : 'Unknown',
+                                'description' => $parsed['relative_description'],
+                                'confidence' => $parsed['confidence']
+                            ];
+                        }
+                    }
+                    
+                    // Add days between calculation if available
+                    if ($daysBetween && $daysBetween['success']) {
+                        $dateInsights[] = [
+                            'expression' => "Days between dates",
+                            'parsed_date' => $daysBetween['days_difference'] . " days",
+                            'description' => $daysBetween['description'],
+                            'confidence' => 100
+                        ];
+                    }
+                    
+                    // Add date info if available
+                    if ($dateInfo && $dateInfo['success']) {
+                        $dateInsights[] = [
+                            'expression' => "Date information",
+                            'parsed_date' => $dateInfo['date'],
+                            'description' => $dateInfo['description'],
+                            'confidence' => 100
+                        ];
+                    }
+                    
+                    if (!empty($dateInsights)) {
+                        $enhanced['tool_insights']['calendar'] = [
+                            'date_insights' => $dateInsights
+                        ];
+                    }
+                }
+            }
+            
+            // Use search for information queries
+            if ($this->isInformationQuery($text)) {
+                // Get search tool through ToolManager
+                $searchTool = $this->toolManager->getTool('search', 'GeneralistAgent');
+                
+                if ($searchTool) {
+                    $searchQuery = $topic ?: $text;
+                    $results = $searchTool->search($searchQuery, 3);
+                    
+                    if (!empty($results['results'])) {
+                        $enhanced['tool_insights']['search'] = [
+                            'query' => $searchQuery,
+                            'results' => array_map(function($result) {
+                                return [
+                                    'title' => $result['title'],
+                                    'snippet' => substr($result['snippet'], 0, 200),
+                                    'url' => $result['url']
+                                ];
+                            }, $results['results']),
+                            'timestamp' => $results['timestamp'],
+                            'is_mock' => $results['is_mock'] ?? false
+                        ];
+                        
+                        // Enhance content with search results if it's an information query
+                        if (empty($enhanced['content']) && $this->isInformationQuery($text)) {
+                            $enhanced['content'] = "Based on search results: " . $results['results'][0]['snippet'];
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            // Log errors but don't break the agent
+            error_log('GeneralistAgent tool integration error: ' . $e->getMessage());
+        }
+        
+        return $enhanced;
+    }
+    
+    /**
+     * Check if the text is related to weather
+     * 
+     * @param string $text Text to analyze
+     * @return bool True if weather related
+     */
+    private function isWeatherRelated(string $text): bool {
+        return preg_match('/\b(?:weather|forecast|temperature|rain|snow|sunny|cloudy|storm|precipitation|humidity|wind)\b/i', $text) === 1;
+    }
+    
+    /**
+     * Check if the text is related to time or dates
+     * 
+     * @param string $text Text to analyze
+     * @return bool True if time related
+     */
+    private function isTimeRelated(string $text): bool {
+        return preg_match('/\b(?:date|time|schedule|when|today|tomorrow|yesterday|next|week|month|year|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i', $text) === 1;
+    }
+    
+    /**
+     * Check if the text is an information query
+     * 
+     * @param string $text Text to analyze
+     * @return bool True if information query
+     */
+    private function isInformationQuery(string $text): bool {
+        return preg_match('/\b(?:what|who|where|when|why|how|tell|explain|describe|information|about|learn|know|find)\b/i', $text) === 1;
+    }
+    
+    /**
+     * Extract location from text
+     * 
+     * @param string $text Text to analyze
+     * @return string|null Location or null if not found
+     */
+    private function extractLocation(string $text): ?string {
+        $locations = [];
+        
+        // Try to find "in [Location]" pattern
+        if (preg_match('/\b(?:in|at|for|near)\s+([A-Z][a-zA-Z\s]{2,})\b/i', $text, $matches)) {
+            $locations[] = trim($matches[1]);
+        }
+        
+        // Look for capitalized places
+        if (preg_match_all('/\b([A-Z][a-zA-Z]{3,}(?:\s+[A-Z][a-zA-Z]{1,})?)\b/', $text, $matches)) {
+            foreach ($matches[1] as $match) {
+                if (!preg_match('/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December)\b/', $match)) {
+                    $locations[] = $match;
+                }
+            }
+        }
+        
+        return !empty($locations) ? $locations[0] : null;
     }
 }

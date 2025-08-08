@@ -12,6 +12,17 @@
  * @since 2025-08-07
  */
 class PlannerAgent {
+    /** @var ToolManager Tool access manager */
+    private ToolManager $toolManager;
+    
+    /**
+     * Constructor - Initialize with tool manager for controlled tool access
+     * 
+     * @param ToolManager $toolManager Tool management service
+     */
+    public function __construct(ToolManager $toolManager) {
+        $this->toolManager = $toolManager;
+    }
     
     /**
      * Create a planning component from provided data
@@ -25,36 +36,42 @@ class PlannerAgent {
         // Extract enhanced planning information from triage context
         $extractedInfo = $this->extractPlanningInformation($data);
         
+        // Enhance planning with tools (Weather, Calendar, Search)
+        $enhancedInfo = $this->enhancePlanningWithTools($extractedInfo);
+        
         return [
             // Core planning information
-            'title' => $extractedInfo['title'] ?? $data['title'] ?? '',
-            'description' => $this->combineDescriptions($data['description'] ?? '', $extractedInfo['description'] ?? ''),
-            'type' => $extractedInfo['type'] ?? $data['type'] ?? 'task',
+            'title' => $enhancedInfo['title'] ?? $data['title'] ?? '',
+            'description' => $this->combineDescriptions($data['description'] ?? '', $enhancedInfo['description'] ?? ''),
+            'type' => $enhancedInfo['type'] ?? $data['type'] ?? 'task',
             
             // Enhanced time parsing
-            'start_date' => $extractedInfo['start_date'] ?? $data['start_date'] ?? null,
-            'end_date' => $extractedInfo['end_date'] ?? $data['end_date'] ?? null,
-            'due_date' => $extractedInfo['due_date'] ?? $data['due_date'] ?? null,
-            'parsed_time_context' => $extractedInfo['time_context'] ?? [],
+            'start_date' => $enhancedInfo['start_date'] ?? $data['start_date'] ?? null,
+            'end_date' => $enhancedInfo['end_date'] ?? $data['end_date'] ?? null,
+            'due_date' => $enhancedInfo['due_date'] ?? $data['due_date'] ?? null,
+            'parsed_time_context' => $enhancedInfo['time_context'] ?? [],
             
             // Smart priority detection
-            'priority' => $this->determinePriority($extractedInfo, $data),
+            'priority' => $this->determinePriority($enhancedInfo, $data),
             'status' => $data['status'] ?? 'pending',
             
             // Location and people extraction
-            'location' => $extractedInfo['location'] ?? $data['location'] ?? '',
-            'attendees' => array_merge($data['attendees'] ?? [], $extractedInfo['attendees'] ?? []),
+            'location' => $enhancedInfo['location'] ?? $data['location'] ?? '',
+            'attendees' => array_merge($data['attendees'] ?? [], $enhancedInfo['attendees'] ?? []),
             
             // Advanced scheduling features
-            'reminders' => $this->generateSmartReminders($extractedInfo),
-            'recurrence' => $extractedInfo['recurrence'] ?? $data['recurrence'] ?? null,
-            'estimated_duration' => $extractedInfo['duration'] ?? $data['estimated_duration'] ?? null,
+            'reminders' => $this->generateSmartReminders($enhancedInfo),
+            'recurrence' => $enhancedInfo['recurrence'] ?? $data['recurrence'] ?? null,
+            'estimated_duration' => $enhancedInfo['duration'] ?? $data['estimated_duration'] ?? null,
             
             // Enhanced context
-            'natural_language_input' => $extractedInfo['original_text'] ?? '',
-            'parsing_confidence' => $extractedInfo['confidence'] ?? 0.8,
-            'extracted_entities' => $extractedInfo['entities'] ?? [],
-            'suggested_tags' => $extractedInfo['tags'] ?? []
+            'natural_language_input' => $enhancedInfo['original_text'] ?? '',
+            'parsing_confidence' => $enhancedInfo['confidence'] ?? 0.8,
+            'extracted_entities' => $enhancedInfo['entities'] ?? [],
+            'suggested_tags' => $enhancedInfo['tags'] ?? [],
+            
+            // Tool insights
+            'tool_insights' => $enhancedInfo['tool_insights'] ?? []
         ];
     }
     
@@ -510,5 +527,126 @@ class PlannerAgent {
         }
         
         return $reminders;
+    }
+    
+    /**
+     * Enhance planning with contextual tools
+     * Uses tools like Weather, Calendar, and Search to provide enhanced planning features
+     * 
+     * @param array $planningData Extracted planning data
+     * @return array Enhanced planning data with tool insights
+     */
+    private function enhancePlanningWithTools(array $planningData): array {
+        // Initialize enhanced data
+        $enhanced = $planningData;
+        $enhanced['tool_insights'] = [];
+        
+        try {
+            // Use CalendarTool for better date parsing
+            if (!empty($planningData['original_text'])) {
+                // Get calendar tool through ToolManager
+                $calendarTool = $this->toolManager->getTool('calendar', 'PlannerAgent');
+                
+                if ($calendarTool) {
+                    $dateText = $planningData['original_text'];
+                    
+                    // Extract date text from context if possible
+                    if (preg_match('/(?:schedule|on|for|at|by)\s+([^.!?]+)/i', $dateText, $matches)) {
+                        $dateText = $matches[1];
+                    }
+                    
+                    $parsedDate = $calendarTool->parseNaturalDate($dateText);
+                    if ($parsedDate['success']) {
+                        // Use the parsed date if confidence is high
+                        if ($parsedDate['confidence'] > 70) {
+                            $enhanced['start_date'] = $parsedDate['datetime']->format('Y-m-d H:i:s');
+                            $enhanced['tool_insights']['calendar'] = [
+                                'parsed_date' => $parsedDate['date_string'],
+                                'parsed_time' => $parsedDate['time_string'],
+                                'confidence' => $parsedDate['confidence'] . '%',
+                                'description' => $parsedDate['relative_description']
+                            ];
+                        }
+                    }
+                }
+            }
+            
+            // Use WeatherTool for location-based planning
+            if (!empty($enhanced['location'])) {
+                // Get weather tool through ToolManager
+                $weatherTool = $this->toolManager->getTool('weather', 'PlannerAgent');
+                
+                if ($weatherTool) {
+                    $location = $enhanced['location'];
+                    
+                    // If location contains an online meeting platform, skip weather check
+                    if (!preg_match('/\b(zoom|teams|skype|meet|webex)\b/i', $location)) {
+                        $weather = $weatherTool->getCurrentWeather($location);
+                        
+                        // If start_date is tomorrow or later, get forecast instead
+                        if (!empty($enhanced['start_date'])) {
+                            $today = new DateTime('today');
+                            $eventDate = new DateTime($enhanced['start_date']);
+                            
+                            if ($eventDate > $today) {
+                                $daysDiff = $today->diff($eventDate)->days;
+                                if ($daysDiff <= 5) { // Only if within forecast range
+                                    $forecast = $weatherTool->getForecast($location, $daysDiff);
+                                    if (!empty($forecast['days'])) {
+                                        $weatherInfo = $forecast['days'][0];
+                                        $enhanced['tool_insights']['weather'] = [
+                                            'forecast' => $weatherInfo['primary_condition'],
+                                            'temperature' => $weatherInfo['temperature_avg'] . '°C',
+                                            'location' => $location,
+                                            'type' => 'forecast'
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Use current weather as fallback
+                        if (empty($enhanced['tool_insights']['weather']) && !empty($weather)) {
+                            $enhanced['tool_insights']['weather'] = [
+                                'current' => $weather['description'],
+                                'temperature' => $weather['temperature'] . '°C',
+                                'location' => $location,
+                                'type' => 'current'
+                            ];
+                        }
+                    }
+                }
+            }
+            
+            // Use SearchTool for contextual information
+            if (!empty($enhanced['title']) && strlen($enhanced['description']) < 100) {
+                // Get search tool through ToolManager
+                $searchTool = $this->toolManager->getTool('search', 'PlannerAgent');
+                
+                if ($searchTool) {
+                    $searchQuery = $enhanced['title'] . ' best practices';
+                    $results = $searchTool->search($searchQuery, 1);
+                    
+                    if (!empty($results['results'])) {
+                        $enhanced['tool_insights']['search'] = [
+                            'query' => $searchQuery,
+                            'info' => substr($results['results'][0]['snippet'], 0, 200),
+                            'source' => $results['results'][0]['url']
+                        ];
+                        
+                        // Use search results to enhance description if needed
+                        if (empty($enhanced['description'])) {
+                            $enhanced['description'] = 'This ' . $enhanced['type'] . ' might involve: ' . 
+                                substr($results['results'][0]['snippet'], 0, 100) . '...';
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            // Log errors but don't break the agent
+            error_log('PlannerAgent tool integration error: ' . $e->getMessage());
+        }
+        
+        return $enhanced;
     }
 }

@@ -5,6 +5,9 @@
  * This tool provides comprehensive date/time manipulation, calendar operations,
  * and intelligent date parsing for scheduling and time-based queries.
  * 
+ * Updated for production: August 8, 2025
+ * Features: Date calculation, holiday recognition, date information retrieval
+ * 
  * @author AI Personal Assistant Team
  * @version 1.0
  * @since 2025-08-07
@@ -68,16 +71,54 @@ class CalendarTool {
             'components' => []
         ];
         
+        // Handle holidays and special dates
+        $holidays = [
+            'christmas' => ['month' => 12, 'day' => 25, 'description' => 'Christmas Day'],
+            'christmas eve' => ['month' => 12, 'day' => 24, 'description' => 'Christmas Eve'],
+            'new year' => ['month' => 1, 'day' => 1, 'description' => 'New Year\'s Day'],
+            'new year\'s day' => ['month' => 1, 'day' => 1, 'description' => 'New Year\'s Day'],
+            'new years day' => ['month' => 1, 'day' => 1, 'description' => 'New Year\'s Day'],
+            'new year\'s eve' => ['month' => 12, 'day' => 31, 'description' => 'New Year\'s Eve'],
+            'valentine\'s day' => ['month' => 2, 'day' => 14, 'description' => 'Valentine\'s Day'],
+            'valentines day' => ['month' => 2, 'day' => 14, 'description' => 'Valentine\'s Day'],
+            'halloween' => ['month' => 10, 'day' => 31, 'description' => 'Halloween'],
+            'thanksgiving' => ['month' => 11, 'day' => null, 'description' => 'Thanksgiving', 'rule' => 'fourth Thursday in November'],
+            'independence day' => ['month' => 7, 'day' => 4, 'description' => 'Independence Day'],
+            'july 4th' => ['month' => 7, 'day' => 4, 'description' => 'Independence Day'],
+            'labor day' => ['month' => 9, 'day' => null, 'description' => 'Labor Day', 'rule' => 'first Monday in September']
+        ];
+        
+        // Check for holiday references
+        foreach ($holidays as $holiday => $info) {
+            if (strpos($input, $holiday) !== false) {
+                $result['datetime'] = new DateTime('now', $this->timezone);
+                $result['datetime']->setDate((int)$result['datetime']->format('Y'), $info['month'], $info['day'] ?? 1);
+                
+                // Handle special rules for holidays without fixed days
+                if (!$info['day']) {
+                    if ($info['rule'] === 'fourth Thursday in November') { // Thanksgiving
+                        $result['datetime']->modify('fourth Thursday of November');
+                    } elseif ($info['rule'] === 'first Monday in September') { // Labor Day
+                        $result['datetime']->modify('first Monday of September');
+                    }
+                }
+                
+                $result['relative_description'] = $info['description'];
+                $result['confidence'] = 90;
+                break;
+            }
+        }
+        
         // Handle today/tomorrow/yesterday
-        if ($this->matchesPattern($input, ['today', 'now'])) {
+        if (!$result['datetime'] && $this->matchesPattern($input, ['today', 'now'])) {
             $result['datetime'] = clone $baseDate;
             $result['relative_description'] = 'today';
             $result['confidence'] = 100;
-        } elseif ($this->matchesPattern($input, ['tomorrow'])) {
+        } elseif (!$result['datetime'] && $this->matchesPattern($input, ['tomorrow'])) {
             $result['datetime'] = (clone $baseDate)->modify('+1 day');
             $result['relative_description'] = 'tomorrow';
             $result['confidence'] = 100;
-        } elseif ($this->matchesPattern($input, ['yesterday'])) {
+        } elseif (!$result['datetime'] && $this->matchesPattern($input, ['yesterday'])) {
             $result['datetime'] = (clone $baseDate)->modify('-1 day');
             $result['relative_description'] = 'yesterday';
             $result['confidence'] = 100;
@@ -478,5 +519,132 @@ class CalendarTool {
         
         $result = implode(', ', array_slice($parts, 0, 2));
         return $result . ($isPast ? ' ago' : '');
+    }
+    
+    /**
+     * Calculate days between two dates
+     * 
+     * @param string $date1 First date (YYYY-MM-DD or natural language)
+     * @param string $date2 Second date (YYYY-MM-DD or natural language)
+     * @return array Result with days difference and formatted dates
+     */
+    public function calculateDaysBetween(string $date1, string $date2): array {
+        $result = [
+            'success' => false,
+            'days_difference' => 0,
+            'formatted_date1' => '',
+            'formatted_date2' => '',
+            'description' => '',
+            'error' => ''
+        ];
+        
+        try {
+            // Parse dates if they're in natural language
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date1)) {
+                $parsed1 = $this->parseNaturalDate($date1);
+                if ($parsed1['success'] && $parsed1['datetime']) {
+                    $dateObj1 = $parsed1['datetime'];
+                    $result['formatted_date1'] = $dateObj1->format('F j, Y');
+                } else {
+                    throw new \Exception("Could not parse first date: $date1");
+                }
+            } else {
+                $dateObj1 = new DateTime($date1, $this->timezone);
+                $result['formatted_date1'] = $dateObj1->format('F j, Y');
+            }
+            
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date2)) {
+                $parsed2 = $this->parseNaturalDate($date2);
+                if ($parsed2['success'] && $parsed2['datetime']) {
+                    $dateObj2 = $parsed2['datetime'];
+                    $result['formatted_date2'] = $dateObj2->format('F j, Y');
+                } else {
+                    throw new \Exception("Could not parse second date: $date2");
+                }
+            } else {
+                $dateObj2 = new DateTime($date2, $this->timezone);
+                $result['formatted_date2'] = $dateObj2->format('F j, Y');
+            }
+            
+            // Calculate the difference
+            $interval = $dateObj1->diff($dateObj2);
+            $result['days_difference'] = $interval->days;
+            $result['success'] = true;
+            
+            // Create a description
+            $result['description'] = "There " . 
+                                   ($interval->days === 1 ? "is 1 day" : "are {$interval->days} days") . 
+                                   " between {$result['formatted_date1']} and {$result['formatted_date2']}.";
+        } catch (\Exception $e) {
+            $result['error'] = $e->getMessage();
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Get date information for a specific date
+     * 
+     * @param string $date Date string (YYYY-MM-DD or natural language)
+     * @return array Date information
+     */
+    public function getDateInfo(string $date): array {
+        $result = [
+            'success' => false,
+            'date' => '',
+            'day_of_week' => '',
+            'day_of_year' => 0,
+            'week_number' => 0,
+            'is_weekend' => false,
+            'is_holiday' => false,
+            'season' => '',
+            'description' => '',
+            'error' => ''
+        ];
+        
+        try {
+            // Parse date if it's in natural language
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                $parsed = $this->parseNaturalDate($date);
+                if ($parsed['success'] && $parsed['datetime']) {
+                    $dateObj = $parsed['datetime'];
+                } else {
+                    throw new \Exception("Could not parse date: $date");
+                }
+            } else {
+                $dateObj = new DateTime($date, $this->timezone);
+            }
+            
+            // Extract date information
+            $result['date'] = $dateObj->format('F j, Y');
+            $result['day_of_week'] = $dateObj->format('l');
+            $result['day_of_year'] = (int)$dateObj->format('z') + 1; // 1-based
+            $result['week_number'] = (int)$dateObj->format('W');
+            $result['is_weekend'] = in_array($dateObj->format('N'), [6, 7]); // 6=Saturday, 7=Sunday
+            
+            // Determine season (Northern Hemisphere)
+            $month = (int)$dateObj->format('n');
+            $day = (int)$dateObj->format('j');
+            
+            if (($month == 3 && $day >= 20) || $month == 4 || $month == 5 || ($month == 6 && $day < 21)) {
+                $result['season'] = 'Spring';
+            } elseif (($month == 6 && $day >= 21) || $month == 7 || $month == 8 || ($month == 9 && $day < 22)) {
+                $result['season'] = 'Summer';
+            } elseif (($month == 9 && $day >= 22) || $month == 10 || $month == 11 || ($month == 12 && $day < 21)) {
+                $result['season'] = 'Fall';
+            } else {
+                $result['season'] = 'Winter';
+            }
+            
+            $result['success'] = true;
+            $result['description'] = "{$result['date']} is a {$result['day_of_week']}, which " . 
+                                  ($result['is_weekend'] ? "is" : "is not") . " a weekend. " .
+                                  "It's day {$result['day_of_year']} of the year, in week {$result['week_number']}, " .
+                                  "during {$result['season']}.";
+        } catch (\Exception $e) {
+            $result['error'] = $e->getMessage();
+        }
+        
+        return $result;
     }
 }
