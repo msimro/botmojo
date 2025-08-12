@@ -9,6 +9,8 @@ require_once 'config.php';
 spl_autoload_register(function ($className) {
     if (file_exists(__DIR__ . '/agents/' . $className . '.php')) {
         require_once __DIR__ . '/agents/' . $className . '.php';
+    } else if (file_exists(__DIR__ . '/tools/' . $className . '.php')) {
+        require_once __DIR__ . '/tools/' . $className . '.php';
     }
 });
 
@@ -35,6 +37,9 @@ try {
     $userInput = $_POST['query'] ?? null;
     if (!$userInput) throw new Exception("No query provided.");
 
+    // Initialize the Tool Manager
+    $toolManager = new ToolManager();
+
     // 1. Triage Stage
     $triagePrompt = file_get_contents('gemini_triage_prompt.txt');
     $fullPrompt = $triagePrompt . "\n\nUser Input: \"{$userInput}\"";
@@ -44,24 +49,55 @@ try {
         throw new Exception("Triage Agent failed to create a valid plan.");
     }
     
-    // ** NEW STEP: Extract the user-facing response **
+    // ** Extract the user-facing response **
     $userMessage = $executionPlan['suggested_response'] ?? "Okay, I'll take care of that.";
 
     // 2. Routing & Execution Stage
     $results = [];
     foreach ($executionPlan['tasks'] as $task) {
         $agentName = $task['target_agent'] ?? 'GeneralistAgent';
-        $taskResult = "ERROR: Agent '{$agentName}' not found or failed to execute.";
+        $taskResult = ["message" => "ERROR: Agent '{$agentName}' not found or failed to execute."];
+        
+        // Check for agent existence
         if (class_exists($agentName)) {
             $agent = new $agentName();
+            
+            // Process tool usage if specified
+            $toolResults = [];
+            if (isset($task['tools']) && is_array($task['tools'])) {
+                foreach ($task['tools'] as $toolRequest) {
+                    $toolName = $toolRequest['tool_name'] ?? '';
+                    $toolParams = $toolRequest['tool_parameters'] ?? [];
+                    
+                    // Get tool via ToolManager
+                    $tool = $toolManager->getTool($toolName, $agentName);
+                    
+                    if ($tool) {
+                        // Execute tool and store results
+                        $toolResults[$toolName] = $tool->execute($toolParams);
+                    } else {
+                        $toolResults[$toolName] = "Tool not available or permission denied";
+                    }
+                }
+            }
+            
+            // Add tool results to task parameters for agent use
+            $task['tool_results'] = $toolResults;
+            
+            // Execute agent with updated task
             $taskResult = $agent->execute($task);
         }
-        $results[] = ['task_id' => $task['task_id'], 'executed_by' => $agentName, 'result' => $taskResult];
+        
+        $results[] = [
+            'task_id' => $task['task_id'], 
+            'executed_by' => $agentName, 
+            'result' => $taskResult
+        ];
     }
     
     // 3. Response Stage
     $finalResponse = [
-        'ai_message_to_user' => $userMessage, // ** The new user-facing message **
+        'ai_message_to_user' => $userMessage,
         'triage_plan' => $executionPlan,
         'execution_results' => $results
     ];
