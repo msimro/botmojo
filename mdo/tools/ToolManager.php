@@ -22,17 +22,39 @@ class ToolManager {
      * Constructor - Initialize and register all available tools
      */
     public function __construct() {
-        // Register available tools - simplified for POC
+        // Register available tools - using main codebase tools
         $this->registerTool('weather', 'WeatherTool');
         $this->registerTool('search', 'SearchTool');
         $this->registerTool('calendar', 'CalendarTool');
         $this->registerTool('database', 'DatabaseTool');
         
+        // Register domain-specific tools from main codebase
+        $this->registerTool('fitness', 'FitnessTool');
+        $this->registerTool('meditation', 'MeditationTool');
+        $this->registerTool('contacts', 'ContactsTool');
+        $this->registerTool('notes', 'NotesTool');
+        $this->registerTool('conversation', 'ConversationCache');
+        $this->registerTool('prompt', 'PromptBuilder');
+        $this->registerTool('response', 'ToolResponseHandler');
+        
         // Configure default agent permissions
-        $this->configureAgentPermissions('GeneralistAgent', ['weather', 'search', 'calendar']);
-        $this->configureAgentPermissions('FinanceAgent', ['database', 'search', 'calendar']);
-        $this->configureAgentPermissions('MemoryAgent', ['database']);
+        $this->configureAgentPermissions('GeneralistAgent', ['weather', 'search', 'calendar', 'database', 'conversation']);
+        $this->configureAgentPermissions('FinanceAgent', ['database', 'search', 'calendar', 'conversation']);
+        $this->configureAgentPermissions('MemoryAgent', ['database', 'conversation']);
+        $this->configureAgentPermissions('PlannerAgent', ['calendar', 'database', 'conversation']);
+        
+        // Configure new domain-specific agent permissions
+        $this->configureAgentPermissions('HealthAgent', ['fitness', 'database', 'calendar', 'weather', 'conversation']);
+        $this->configureAgentPermissions('SpiritualAgent', ['meditation', 'database', 'calendar', 'conversation']);
+        $this->configureAgentPermissions('SocialAgent', ['contacts', 'calendar', 'database', 'conversation']);
+        $this->configureAgentPermissions('LearningAgent', ['notes', 'search', 'database', 'conversation']);
         $this->configureAgentPermissions('PlannerAgent', ['calendar', 'database', 'search']);
+        
+        // Configure permissions for new domain-specific agents
+        $this->configureAgentPermissions('HealthAgent', ['database', 'search', 'calendar', 'weather', 'fitness']);
+        $this->configureAgentPermissions('SpiritualAgent', ['database', 'search', 'meditation']);
+        $this->configureAgentPermissions('SocialAgent', ['database', 'calendar', 'search', 'contacts']);
+        $this->configureAgentPermissions('LearningAgent', ['database', 'search', 'calendar', 'notes']);
     }
     
     /**
