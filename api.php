@@ -144,6 +144,11 @@ try {
     // Initialize container for assembled components
     $assembledComponents = [];
     
+    // Generate unique identifier for the new entity
+    $entityId = generateUUID();
+    $entityType = $triageResponse['target_entity']['type'] ?? 'general';
+    $entityName = $triageResponse['target_entity']['alias'] ?? 'Untitled Entity';
+    
     // Process each component task assigned by the triage AI
     if (isset($triageResponse['component_tasks']) && is_array($triageResponse['component_tasks'])) {
         foreach ($triageResponse['component_tasks'] as $task) {
@@ -172,6 +177,9 @@ try {
                 case 'SocialAgent':
                     $agent = new SocialAgent($toolManager);
                     break;
+                case 'RelationshipAgent':
+                    $agent = new RelationshipAgent($toolManager);
+                    break;
                 case 'LearningAgent':
                     $agent = new LearningAgent($toolManager);
                     break;
@@ -192,7 +200,9 @@ try {
                     'triage_summary' => $triageResponse['triage_summary'] ?? '',
                     'original_query' => $userQuery,
                     'conversation_id' => $conversationId,
-                    'full_triage_response' => $triageResponse
+                    'full_triage_response' => $triageResponse,
+                    'entity_id' => $entityId,  // Pass the entity ID to the agent
+                    'user_id' => $userId       // Pass the user ID to the agent
                 ]);
                 
                 $assembledComponents[$componentName] = $agent->createComponent($enhancedComponentData);
@@ -206,11 +216,6 @@ try {
     
     // Save entity to database if we have components or target entity information
     if (!empty($assembledComponents) || isset($triageResponse['target_entity'])) {
-        // Generate unique identifier for the new entity
-        $entityId = generateUUID();
-        $entityType = $triageResponse['target_entity']['type'] ?? 'general';
-        $entityName = $triageResponse['target_entity']['alias'] ?? 'Untitled Entity';
-        
         // Create the comprehensive entity data structure
         $entityData = [
             'triage_summary' => $triageResponse['triage_summary'] ?? '',   // AI's understanding summary

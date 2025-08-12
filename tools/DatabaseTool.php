@@ -152,4 +152,133 @@ class DatabaseTool {
         $result = $stmt->get_result();
         return $result->fetch_all(MYSQLI_ASSOC);
     }
+    
+    /**
+     * Create a new relationship between two entities
+     * Establishes a typed connection between source and target entities
+     * 
+     * @param string $id Unique identifier for the relationship (UUID format)
+     * @param string $userId User who owns this relationship
+     * @param string $sourceEntityId ID of the source entity
+     * @param string $targetEntityId ID of the target entity
+     * @param string $type Type of relationship (e.g., 'works_at', 'friends_with')
+     * @param float $strength Strength of relationship (0.01-1.00)
+     * @param string|null $metadata Optional JSON-encoded metadata about the relationship
+     * @return bool True if creation was successful, false otherwise
+     */
+    public function createRelationship(string $id, string $userId, string $sourceEntityId, 
+                                      string $targetEntityId, string $type, 
+                                      float $strength = 1.0, ?string $metadata = null): bool {
+        // Debug logging
+        error_log("DatabaseTool: Creating relationship '{$type}' from {$sourceEntityId} to {$targetEntityId}");
+        
+        // Verify source entity exists
+        $sourceEntity = $this->findEntity($sourceEntityId);
+        if (!$sourceEntity) {
+            error_log("DatabaseTool: Error - Source entity {$sourceEntityId} does not exist");
+            return false;
+        }
+        
+        // Verify target entity exists
+        $targetEntity = $this->findEntity($targetEntityId);
+        if (!$targetEntity) {
+            error_log("DatabaseTool: Error - Target entity {$targetEntityId} does not exist");
+            return false;
+        }
+        
+        // Create the relationship
+        $stmt = $this->db->prepare("INSERT INTO relationships (id, user_id, source_entity_id, 
+                                   target_entity_id, type, strength, metadata) 
+                                   VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssds", $id, $userId, $sourceEntityId, $targetEntityId, 
+                                    $type, $strength, $metadata);
+        $result = $stmt->execute();
+        
+        if ($result) {
+            error_log("DatabaseTool: Successfully created relationship '{$type}' with ID {$id}");
+        } else {
+            error_log("DatabaseTool: Failed to create relationship: " . $this->db->error);
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Find relationships for a specific entity
+     * Can retrieve either incoming or outgoing relationships, or both
+     * 
+     * @param string $entityId ID of the entity to find relationships for
+     * @param string|null $type Optional relationship type filter
+     * @param string $direction Direction of relationships to find ('outgoing', 'incoming', or 'both')
+     * @return array Array of relationship records
+     */
+    public function findRelationships(string $entityId, ?string $type = null, string $direction = 'both'): array {
+        $params = [];
+        $whereConditions = [];
+        
+        // Base query without WHERE conditions
+        $query = "SELECT r.*, 
+                 s.primary_name as source_name, s.type as source_type,
+                 t.primary_name as target_name, t.type as target_type
+                 FROM relationships r
+                 JOIN entities s ON r.source_entity_id = s.id
+                 JOIN entities t ON r.target_entity_id = t.id";
+        
+        // Add direction condition
+        if ($direction === 'outgoing' || $direction === 'both') {
+            $whereConditions[] = "r.source_entity_id = ?";
+            $params[] = $entityId;
+        }
+        
+        if ($direction === 'incoming' || $direction === 'both') {
+            if ($direction === 'both') {
+                $whereConditions[count($whereConditions) - 1] .= " OR r.target_entity_id = ?";
+            } else {
+                $whereConditions[] = "r.target_entity_id = ?";
+            }
+            $params[] = $entityId;
+        }
+        
+        // Add type filter if provided
+        if ($type !== null) {
+            $whereConditions[] = "r.type = ?";
+            $params[] = $type;
+        }
+        
+        // Build final query with WHERE conditions
+        if (!empty($whereConditions)) {
+            $query .= " WHERE " . implode(" AND ", $whereConditions);
+        }
+        
+        return $this->executeParameterizedQuery($query, $params);
+    }
+    
+    /**
+     * Find entities related to a specific entity
+     * Helper method to find connected entities through relationships
+     * 
+     * @param string $entityId ID of the source entity
+     * @param string|null $relationType Optional relationship type filter
+     * @param string|null $entityType Optional target entity type filter
+     * @return array Array of related entities with relationship data
+     */
+    public function findRelatedEntities(string $entityId, ?string $relationType = null, ?string $entityType = null): array {
+        $params = [$entityId];
+        $query = "SELECT e.*, r.type as relationship_type, r.strength, r.metadata as relationship_metadata
+                 FROM entities e
+                 JOIN relationships r ON e.id = r.target_entity_id
+                 WHERE r.source_entity_id = ?";
+        
+        if ($relationType !== null) {
+            $query .= " AND r.type = ?";
+            $params[] = $relationType;
+        }
+        
+        if ($entityType !== null) {
+            $query .= " AND e.type = ?";
+            $params[] = $entityType;
+        }
+        
+        return $this->executeParameterizedQuery($query, $params);
+    }
 }

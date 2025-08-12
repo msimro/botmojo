@@ -36,6 +36,14 @@ class MemoryAgent {
         // Extract enhanced information from triage context if available
         $extractedInfo = $this->extractEnhancedInformation($data);
         
+        // Debug logging
+        error_log("MemoryAgent: Creating component for " . ($extractedInfo['name'] ?? 'unknown entity'));
+        error_log("MemoryAgent: Entity ID from data: " . ($data['entity_id'] ?? 'not provided'));
+        error_log("MemoryAgent: Relationships found: " . count($extractedInfo['relationships'] ?? []));
+        
+        // Check if we need to save relationships to the database
+        $this->processRelationships($extractedInfo, $data);
+        
         return [
             // Core identity information
             'name' => $extractedInfo['name'] ?? $data['name'] ?? '',       // Primary name or identifier
@@ -267,5 +275,196 @@ class MemoryAgent {
         if ($score >= 1.0) return 'high';
         if ($score >= 0.5) return 'medium';
         return 'low';
+    }
+    
+    /**
+     * Process relationships from extracted information and store in database
+     * 
+     * @param array $extractedInfo Information extracted from context
+     * @param array $originalData Original data from triage
+     * @return void
+     */
+    private function processRelationships(array $extractedInfo, array $originalData): void {
+        // Skip if no relationships were identified
+        if (empty($extractedInfo['relationships'])) {
+            error_log("MemoryAgent: No relationships found to process");
+            return;
+        }
+        
+        // Get DatabaseTool instance
+        $dbTool = $this->toolManager->getTool('database');
+        if (!$dbTool) {
+            // Log error if database tool is not available
+            error_log("MemoryAgent: DatabaseTool not available for relationship processing");
+            return;
+        }
+        
+        // Get user ID from original data or use default
+        $userId = $originalData['user_id'] ?? DEFAULT_USER_ID;
+        error_log("MemoryAgent: Processing relationships with user ID: {$userId}");
+        
+        // First, ensure the source entity exists in the database
+        $sourceEntityName = $extractedInfo['name'] ?? $originalData['name'] ?? 'unknown';
+        $sourceEntityType = $extractedInfo['type'] ?? $originalData['type'] ?? 'person';
+        
+        error_log("MemoryAgent: Source entity info - Name: {$sourceEntityName}, Type: {$sourceEntityType}");
+        
+        // Generate entity ID for the source entity if not provided
+        $sourceEntityId = $originalData['entity_id'] ?? null;
+        error_log("MemoryAgent: Source entity ID from original data: " . ($sourceEntityId ?? 'null'));
+        
+        if (!$sourceEntityId) {
+            // Try to find existing entity by name
+            $query = "SELECT id FROM entities WHERE user_id = ? AND primary_name = ?";
+            $results = $dbTool->executeParameterizedQuery($query, [$userId, $sourceEntityName]);
+            
+            if (!empty($results)) {
+                $sourceEntityId = $results[0]['id'];
+                error_log("MemoryAgent: Found existing source entity with ID: {$sourceEntityId}");
+            } else {
+                // Create a new entity for the source
+                $sourceEntityId = $this->generateEntityId($sourceEntityName);
+                $sourceEntityData = json_encode([
+                    'name' => $sourceEntityName,
+                    'type' => $sourceEntityType,
+                    'attributes' => $extractedInfo['attributes'] ?? [],
+                    'notes' => 'Created automatically for relationship source',
+                    'created_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                $result = $dbTool->saveNewEntity($sourceEntityId, $userId, $sourceEntityType, $sourceEntityName, $sourceEntityData);
+                error_log("MemoryAgent: Created source entity '{$sourceEntityName}' with ID '{$sourceEntityId}' - Result: " . ($result ? 'success' : 'failed'));
+            }
+        }
+        
+        // Process each relationship
+        $relationshipCount = count($extractedInfo['relationships']);
+        error_log("MemoryAgent: Processing {$relationshipCount} relationships");
+        
+        foreach ($extractedInfo['relationships'] as $index => $relationship) {
+            // Skip incomplete relationship data
+            if (empty($relationship['type']) || empty($relationship['target'])) {
+                error_log("MemoryAgent: Skipping incomplete relationship at index {$index}");
+                continue;
+            }
+            
+            $relType = $relationship['type'];
+            $targetName = $relationship['target'];
+            error_log("MemoryAgent: Processing relationship {$index} - Type: {$relType}, Target: {$targetName}");
+            
+            // Generate target entity ID if needed
+            $targetType = $relationship['target_type'] ?? 'entity';
+            $targetEntityId = $this->findOrCreateTargetEntity($dbTool, $userId, $targetName, $targetType);
+            
+            if (!$targetEntityId) {
+                error_log("MemoryAgent: Failed to get target entity ID for '{$targetName}'");
+                continue;
+            }
+            
+            error_log("MemoryAgent: Target entity ID: {$targetEntityId}");
+            
+            // Generate relationship metadata if available
+            $metadata = null;
+            if (!empty($relationship['metadata'])) {
+                $metadata = json_encode($relationship['metadata']);
+            }
+            
+            // Calculate relationship strength (default 1.0)
+            $strength = $relationship['strength'] ?? 1.0;
+            
+            // Create relationship ID
+            $relationshipId = $this->generateRelationshipId($sourceEntityId, $targetEntityId, $relationship['type']);
+            
+            // Store relationship in database
+            $relationType = $relationship['relationship'] ?? $relationship['type'];
+            error_log("MemoryAgent: Creating relationship ID: {$relationshipId}, Type: {$relationType}");
+            
+            $result = $dbTool->createRelationship(
+                $relationshipId,
+                $userId,
+                $sourceEntityId,
+                $targetEntityId,
+                $relationType,
+                $strength,
+                $metadata
+            );
+            
+            if ($result) {
+                error_log("MemoryAgent: Successfully created relationship '{$relationType}' from '{$sourceEntityName}' to '{$targetName}'");
+            } else {
+                error_log("MemoryAgent: Failed to create relationship '{$relationType}' from '{$sourceEntityName}' to '{$targetName}'");
+            }
+        }
+    }
+    
+    /**
+     * Generate a unique entity ID based on name
+     * 
+     * @param string $name Entity name
+     * @return string Unique entity ID
+     */
+    private function generateEntityId(string $name): string {
+        return 'entity_' . md5($name . '_' . time());
+    }
+    
+    /**
+     * Generate a unique relationship ID
+     * 
+     * @param string $sourceId Source entity ID
+     * @param string $targetId Target entity ID
+     * @param string $type Relationship type
+     * @return string Unique relationship ID
+     */
+    private function generateRelationshipId(string $sourceId, string $targetId, string $type): string {
+        return 'rel_' . md5($sourceId . '_' . $targetId . '_' . $type . '_' . time());
+    }
+    
+    /**
+     * Find existing entity or create a new one for relationship target
+     * 
+     * @param DatabaseTool $dbTool Database tool instance
+     * @param string $userId User ID
+     * @param string $name Entity name
+     * @param string $type Entity type
+     * @return string|null Entity ID or null on failure
+     */
+    private function findOrCreateTargetEntity(DatabaseTool $dbTool, string $userId, string $name, string $type): ?string {
+        // Search for existing entity with this name
+        $query = "SELECT id FROM entities WHERE user_id = ? AND primary_name = ?";
+        error_log("MemoryAgent: Searching for target entity with name: {$name}");
+        
+        try {
+            $results = $dbTool->executeParameterizedQuery($query, [$userId, $name]);
+            
+            // Return existing entity ID if found
+            if (!empty($results)) {
+                $entityId = $results[0]['id'];
+                error_log("MemoryAgent: Found existing target entity with ID: {$entityId}");
+                return $entityId;
+            }
+            
+            // Create new entity if not found
+            $entityId = $this->generateEntityId($name);
+            $entityData = json_encode([
+                'name' => $name,
+                'type' => $type,
+                'attributes' => [],
+                'notes' => 'Created automatically for relationship tracking',
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+            
+            $result = $dbTool->saveNewEntity($entityId, $userId, $type, $name, $entityData);
+            
+            if ($result) {
+                error_log("MemoryAgent: Successfully created target entity '{$name}' with ID '{$entityId}'");
+                return $entityId;
+            } else {
+                error_log("MemoryAgent: Failed to create target entity '{$name}'");
+                return null;
+            }
+        } catch (Exception $e) {
+            error_log("MemoryAgent: Error in findOrCreateTargetEntity: " . $e->getMessage());
+            return null;
+        }
     }
 }
