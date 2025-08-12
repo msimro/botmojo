@@ -53,9 +53,24 @@ class PromptBuilder {
      * @return string Template with placeholders replaced by actual values
      */
     public function replacePlaceholders(string $template, array $placeholders): string {
+        $result = $template;
+        
         foreach ($placeholders as $placeholder => $value) {
-            $template = str_replace("{{{$placeholder}}}", $value, $template);
+            $result = str_replace('{{' . $placeholder . '}}', $value, $result);
         }
-        return $template;
+        
+        // Handle dynamic system placeholders
+        $dynamicPlaceholders = [
+            '{{current_date}}' => date('Y-m-d'),
+            '{{current_time}}' => date('H:i:s'),
+            '{{day_of_week}}' => date('l'),
+            '{{timezone}}' => date_default_timezone_get()
+        ];
+        
+        foreach ($dynamicPlaceholders as $placeholder => $value) {
+            $result = str_replace($placeholder, $value, $result);
+        }
+        
+        return $result;
     }
 }

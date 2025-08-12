@@ -94,7 +94,8 @@ try {
     // Build the triage prompt using dynamic template assembly
     $triagePrompt = $promptBuilder->build('base/triage_agent_base.txt', [
         'agent_definitions' => 'components/agent_definitions.txt',
-        'output_format' => 'formats/triage_json_output.txt'
+        'output_format' => 'formats/triage_json_output.txt',
+        'user_profile' => 'components/user_profile.txt'
     ]);
     
     // Replace conversation history placeholder with actual content
