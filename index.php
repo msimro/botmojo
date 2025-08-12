@@ -155,6 +155,8 @@
         <div class="input-container">
             <input type="text" id="userInput" placeholder="Type your message here..." autocomplete="off">
             <button id="sendBtn" onclick="sendMessage()">Send</button>
+            <button id="debugToggle" onclick="toggleDebugMode()" style="background-color: #6c757d; margin-left: 10px;">Debug: Off</button>
+            <button id="clearBtn" onclick="clearChat()" style="background-color: #dc3545; margin-left: 10px;">Clear</button>
         </div>
         
         <!-- =================================================================
@@ -206,6 +208,8 @@
         
         // Generate unique conversation ID for this session
         let conversationId = 'conv_' + Date.now();
+        // Debug mode flag
+        let debugMode = false;
         
         // =================================================================
         // UI MANIPULATION FUNCTIONS
@@ -215,13 +219,24 @@
          * Add a message bubble to the chat interface
          * @param {string} content - The message text to display
          * @param {boolean} isUser - True for user messages, false for assistant
+         * @param {object} debugData - Optional debug data to display
          */
-        function addMessage(content, isUser = false) {
+        function addMessage(content, isUser = false, debugData = null) {
             const chatContainer = document.getElementById('chatContainer');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
             messageDiv.textContent = content;
             chatContainer.appendChild(messageDiv);
+            
+            // If debug mode is on and we have debug data, display it
+            if (debugMode && debugData && !isUser) {
+                const debugDiv = document.createElement('div');
+                debugDiv.className = 'debug-info';
+                debugDiv.style.cssText = 'margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-family: monospace; font-size: 12px; white-space: pre-wrap; overflow-x: auto;';
+                debugDiv.textContent = JSON.stringify(debugData, null, 2);
+                chatContainer.appendChild(debugDiv);
+            }
+            
             chatContainer.scrollTop = chatContainer.scrollHeight; // Auto-scroll to bottom
         }
         
@@ -270,7 +285,8 @@
                     },
                     body: JSON.stringify({
                         query: message,
-                        conversation_id: conversationId
+                        conversation_id: conversationId,
+                        debug_mode: debugMode
                     })
                 });
                 
@@ -284,7 +300,7 @@
                 
                 // Display appropriate response based on success/failure
                 if (data.success && data.response) {
-                    addMessage(data.response);
+                    addMessage(data.response, false, data.debug || data.triage_data);
                 } else {
                     addMessage('Sorry, I encountered an error processing your request: ' + (data.error || 'Unknown error'));
                 }
@@ -316,6 +332,16 @@
             chatContainer.innerHTML = '<div class="status">Chat cleared. Ready to assist you!</div>';
             // Generate new conversation ID for fresh start
             conversationId = 'conv_' + Date.now();
+        }
+        
+        /**
+         * Toggle debug mode on/off
+         */
+        function toggleDebugMode() {
+            debugMode = !debugMode;
+            const debugBtn = document.getElementById('debugToggle');
+            debugBtn.textContent = debugMode ? 'Debug: On' : 'Debug: Off';
+            debugBtn.style.backgroundColor = debugMode ? '#28a745' : '#6c757d';
         }
         
         // =================================================================

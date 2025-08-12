@@ -63,6 +63,10 @@ try {
     $conversationId = $input['conversation_id'] ?? 'default_conversation';
     $userId = DEFAULT_USER_ID;
     
+    // Check if the request includes debug mode override
+    $debugModeOverride = isset($input['debug_mode']) ? (bool)$input['debug_mode'] : null;
+    $isDebugMode = ($debugModeOverride !== null) ? $debugModeOverride : DEBUG_MODE;
+    
     // Ensure query is not empty
     if (empty($userQuery)) {
         throw new Exception('Query cannot be empty.');
@@ -254,14 +258,16 @@ try {
         'timestamp' => date('Y-m-d H:i:s')
     ];
     
-    // Include debug data if in development mode
-    if (DEBUG_MODE) {
+    // Include debug data if in development mode or explicitly requested
+    if ($isDebugMode) {
         $responseData['triage_data'] = $triageResponse;
         $responseData['debug'] = [
             'original_response' => $suggestedResponse,
             'enhanced_response' => $enhancedResponse,
             'has_weather_component' => !empty($assembledComponents['general_component']['tool_insights']['weather']),
-            'components' => array_keys($assembledComponents)
+            'components' => array_keys($assembledComponents),
+            'execution_results' => $executionResults ?? [],
+            'component_data' => $assembledComponents
         ];
     }
     
