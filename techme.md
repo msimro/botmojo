@@ -1,15 +1,19 @@
 # BotMojo Technical Brief - Phase 1 Complete ✅
 
-## 1. Project Overview & Core Philosophy
+## 1. Project Overview & Core Architecture
 
-**BotMojo** is an intelligent, modular, multi-agent personal assistant designed as a sophisticated system for understanding and managing user life data. **Phase 1 is now complete** with all four agents enhanced to v1.1 with advanced AI capabilities.
+**BotMojo** is a strictly typed PHP 8.3 multi-agent system with centralized tool management and controlled agent permissions. The system is built around a core `ToolManager` that manages all tool access and permissions.
 
-The core architectural philosophy is **Triage-First, Agent-Based Component Assembly**.
+The actual architecture implementation consists of:
 
-- **Triage-First:** Every user input is first sent to a specialized AI **Triage Agent** that analyzes intent and creates structured JSON execution plans
-- **Agent-Based:** Execution plans assign tasks to specialized **Agents** (Memory, Planner, Finance, Generalist) keeping logic modular and clean  
-- **Component Assembly:** Unified data model centered around **Entities** with agent-created **Components** assembled into context-rich JSON objects
-- **Enhanced Intelligence:** All agents now feature sophisticated parsing, categorization, and analysis capabilities
+- **Centralized Tool Management:** All tool access is controlled through `ToolManager`, providing strict access control and lazy loading
+- **Agent-Based Processing:** Each agent has explicitly defined tool permissions:
+  - GeneralistAgent: weather, search, calendar, conversation
+  - FinanceAgent: database, search, calendar
+  - MemoryAgent: database, conversation
+  - PlannerAgent: calendar, database, search
+- **Component Creation:** Each agent implements a standardized `createComponent()` method
+- **Strict Error Handling:** Comprehensive input validation and error management throughout
 
 ## 2. Technical Stack & Environment
 
