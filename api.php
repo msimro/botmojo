@@ -158,6 +158,18 @@ try {
                 case 'PlannerAgent':
                     $agent = new PlannerAgent($toolManager);
                     break;
+                case 'HealthAgent':
+                    $agent = new HealthAgent($toolManager);
+                    break;
+                case 'SpiritualAgent':
+                    $agent = new SpiritualAgent($toolManager);
+                    break;
+                case 'SocialAgent':
+                    $agent = new SocialAgent($toolManager);
+                    break;
+                case 'LearningAgent':
+                    $agent = new LearningAgent($toolManager);
+                    break;
                 case 'GeneralistAgent':
                     $agent = new GeneralistAgent($toolManager);
                     break;

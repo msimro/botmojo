@@ -51,6 +51,64 @@ class DatabaseTool {
     }
     
     /**
+     * Execute a parameterized query and return results as an array
+     * 
+     * @param string $query SQL query with placeholders
+     * @param array $params Parameters to bind to the query
+     * @return array Results as associative array
+     */
+    public function executeParameterizedQuery(string $query, array $params = []): array {
+        $stmt = $this->db->prepare($query);
+        
+        if (!$stmt) {
+            error_log("Database query preparation failed: " . $this->db->error);
+            return [];
+        }
+        
+        // Bind parameters if any
+        if (!empty($params)) {
+            $types = '';
+            $bindParams = [];
+            
+            // Determine parameter types
+            foreach ($params as $param) {
+                if (is_int($param)) {
+                    $types .= 'i';
+                } elseif (is_float($param)) {
+                    $types .= 'd';
+                } else {
+                    $types .= 's';
+                }
+                $bindParams[] = $param;
+            }
+            
+            // Create array with references as required by bind_param
+            $bindArgs = [];
+            $bindArgs[] = $types;
+            
+            foreach ($bindParams as $key => $value) {
+                $bindArgs[] = &$bindParams[$key];
+            }
+            
+            call_user_func_array([$stmt, 'bind_param'], $bindArgs);
+        }
+        
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if (!$result) {
+            return [];
+        }
+        
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        
+        return $rows;
+    }
+    
+    /**
      * Find a specific entity by its ID
      * Retrieves a single entity record from the database
      * 

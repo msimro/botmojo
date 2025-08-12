@@ -31,11 +31,23 @@ class ToolManager {
         $this->registerTool('conversation', ConversationCache::class);
         $this->registerTool('prompt', PromptBuilder::class);
         
+        // Register new domain-specific tools
+        $this->registerTool('fitness', FitnessTool::class);
+        $this->registerTool('meditation', MeditationTool::class);
+        $this->registerTool('contacts', ContactsTool::class);
+        $this->registerTool('notes', NotesTool::class);
+        
         // Configure default agent permissions
         $this->configureAgentPermissions('GeneralistAgent', ['weather', 'search', 'calendar', 'conversation']);
         $this->configureAgentPermissions('FinanceAgent', ['database', 'search', 'calendar']);
         $this->configureAgentPermissions('MemoryAgent', ['database', 'conversation']);
         $this->configureAgentPermissions('PlannerAgent', ['calendar', 'database', 'search']);
+        
+        // Configure permissions for new domain-specific agents
+        $this->configureAgentPermissions('HealthAgent', ['database', 'search', 'calendar', 'weather']);
+        $this->configureAgentPermissions('SpiritualAgent', ['database', 'search', 'conversation']);
+        $this->configureAgentPermissions('SocialAgent', ['database', 'calendar', 'search', 'conversation']);
+        $this->configureAgentPermissions('LearningAgent', ['database', 'search', 'calendar', 'conversation']);
         
         // Give API orchestrator access to all tools
         $this->configureAgentPermissions('APIOrchestrator', array_keys($this->tools));
