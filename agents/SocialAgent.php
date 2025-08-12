@@ -68,14 +68,25 @@ class SocialAgent {
             $socialEvents
         );
         
+        // Return component in the standard format matching existing agents and database schema
         return [
-            'type' => 'social_component',
-            'analysis' => $socialAnalysis,
-            'data' => [
-                'social_info' => $socialInfo,
-                'contacts' => $this->sanitizeContactsData($contactsData),
-                'events' => $socialEvents
-            ]
+            // Core social information
+            'relationship_insights' => $socialAnalysis['relationship_insights'] ?? 'General social insights',
+            'communication_tips' => $socialAnalysis['communication_tips'] ?? [],
+            'event_recommendations' => $socialAnalysis['event_recommendations'] ?? '',
+            
+            // Contact and event data
+            'contacts' => $this->sanitizeContactsData($contactsData),
+            'upcoming_events' => $socialEvents,
+            
+            // Context specifics
+            'relationship_focus' => $socialInfo['relationship_focus'] ?? '',
+            'communication_context' => $socialInfo['communication_context'] ?? '',
+            'event_type' => $socialInfo['event_type'] ?? '',
+            
+            // Metadata
+            'query_type' => $socialInfo['query_type'] ?? 'general_social',
+            'time_period' => $socialInfo['time_period'] ?? 'current',
         ];
     }
     

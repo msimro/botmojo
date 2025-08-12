@@ -78,15 +78,26 @@ class SpiritualAgent {
         $insights['note'] = "These spiritual insights are offered as perspectives for consideration. " .
                             "Please adapt them to your own beliefs and practices.";
         
+        // Return component in the standard format matching existing agents and database schema
         return [
-            'type' => 'spiritual_component',
-            'insights' => $insights,
-            'data' => [
-                'spiritual_info' => $spiritualInfo,
-                'practice_records' => $practiceRecords,
-                'meditation_data' => $meditationData,
-                'spiritual_search_results' => $spiritualSearchResults
-            ]
+            // Core spiritual information
+            'reflection' => $insights['reflection'] ?? 'General spiritual reflection',
+            'practice_suggestion' => $insights['practices'] ?? '',
+            'tradition' => $spiritualInfo['tradition'] ?? 'non_specific',
+            
+            // Inspirational content
+            'quotes' => $insights['inspirational_quotes'] ?? [],
+            'philosophical_insights' => $spiritualInfo['philosophical_question'] ? $insights['reflection'] : '',
+            'guidance_note' => $insights['note'] ?? '',
+            
+            // Practice data
+            'meditation_stats' => $meditationData,
+            'historical_practices' => $practiceRecords,
+            
+            // Metadata
+            'practice_type' => $spiritualInfo['practice_type'] ?? '',
+            'query_type' => $spiritualInfo['query_type'] ?? 'general_spiritual',
+            'time_period' => $spiritualInfo['time_period'] ?? 'current',
         ];
     }
     

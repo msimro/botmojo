@@ -75,15 +75,30 @@ class LearningAgent {
             $educationalContent
         );
         
+        // Return component in the standard format matching existing agents and database schema
         return [
-            'type' => 'learning_component',
-            'learning_plan' => $learningPlan,
-            'data' => [
-                'learning_info' => $learningInfo,
-                'learning_history' => $learningHistory,
-                'notes' => $notesData,
-                'educational_content' => $educationalContent
-            ]
+            // Core learning information
+            'learning_overview' => $learningPlan['overview'] ?? 'General learning plan',
+            'learning_steps' => $learningPlan['learning_steps'] ?? [],
+            'recommended_resources' => $learningPlan['recommended_resources'] ?? [],
+            
+            // Learning details
+            'subject' => $learningInfo['subject'] ?? '',
+            'skill_level' => $learningInfo['skill_level'] ?? 'beginner',
+            'learning_goal' => $learningInfo['learning_goal'] ?? '',
+            
+            // Planning and schedule
+            'suggested_pace' => $learningPlan['suggested_pace'] ?? '',
+            'study_schedule' => $learningPlan['study_schedule'] ?? [],
+            
+            // Historical data and notes
+            'learning_history' => $learningHistory,
+            'notes' => $notesData,
+            
+            // Metadata
+            'time_available' => $learningInfo['time_available'] ?? '',
+            'preferred_resources' => $learningInfo['preferred_resources'] ?? [],
+            'query_type' => $learningInfo['query_type'] ?? 'general_learning',
         ];
     }
     

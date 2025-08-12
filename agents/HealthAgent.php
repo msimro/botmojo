@@ -78,15 +78,25 @@ class HealthAgent {
         $analysis['disclaimer'] = "This information is not a substitute for professional medical advice. " .
                                   "Please consult with a healthcare provider for medical concerns.";
         
+        // Return component in the standard format matching existing agents and database schema
         return [
-            'type' => 'health_component',
-            'analysis' => $analysis,
-            'data' => [
-                'health_info' => $healthInfo,
-                'health_records' => $this->sanitizeHealthRecords($healthRecords),
-                'fitness_data' => $fitnessData,
-                'health_search_results' => $healthSearchResults
-            ]
+            // Core health metrics
+            'health_status' => $analysis['summary'] ?? 'General health assessment',
+            'health_metrics' => $healthInfo['specific_metrics'] ?? [],
+            'health_topic' => $healthInfo['health_topic'] ?? 'general_health',
+            
+            // Detailed health information
+            'analysis' => $analysis['details'] ?? '',
+            'recommendations' => $analysis['recommendations'] ?? [],
+            'disclaimer' => $analysis['disclaimer'] ?? '',
+            
+            // Additional data sources
+            'fitness_data' => $fitnessData,
+            'historical_records' => $this->sanitizeHealthRecords($healthRecords),
+            
+            // Metadata
+            'query_type' => $healthInfo['query_type'] ?? 'general_health',
+            'time_period' => $healthInfo['time_period'] ?? 'current',
         ];
     }
     
