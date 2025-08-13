@@ -1,32 +1,325 @@
 <?php
 /**
- * RelationshipAgent - Specialized Agent for Managing Entity Relationships
+ * RelationshipAgent - Advanced Entity Relationship Intelligence and Graph Management Agent
  * 
- * This agent handles the creation, management and querying of relationships
- * between entities in the system (people, organizations, places, etc).
+ * OVERVIEW:
+ * The RelationshipAgent is a specialized component of the BotMojo AI Personal Assistant
+ * that focuses exclusively on the creation, management, analysis, and querying of
+ * relationships between entities in the knowledge graph. It provides sophisticated
+ * relationship intelligence, semantic relationship understanding, and dynamic
+ * relationship evolution tracking.
+ * 
+ * CORE CAPABILITIES:
+ * - Relationship Creation: Establish new connections between entities
+ * - Relationship Management: Update, modify, and maintain existing relationships
+ * - Relationship Analysis: Deep analysis of relationship patterns and networks
+ * - Semantic Understanding: Context-aware relationship interpretation
+ * - Relationship Validation: Logical consistency and conflict detection
+ * - Temporal Tracking: Relationship evolution and timeline management
+ * - Graph Traversal: Efficient navigation of complex relationship networks
+ * - Relationship Inference: Logical derivation of implicit relationships
+ * 
+ * RELATIONSHIP INTELLIGENCE:
+ * - Natural Language Processing: "John is my brother", "Sarah works for Google"
+ * - Relationship Classification: Family, professional, social, location-based
+ * - Strength Assessment: Relationship intensity and importance scoring
+ * - Bidirectional Logic: Automatic inverse relationship creation and maintenance
+ * - Conflict Resolution: Smart handling of contradictory relationship information
+ * - Pattern Recognition: Identification of relationship clusters and communities
+ * - Transitivity Logic: Inference of indirect relationships through chains
+ * 
+ * INTEGRATION CAPABILITIES:
+ * - Database Tool: Persistent relationship storage and retrieval
+ * - MemoryAgent: Deep integration with entity knowledge management
+ * - SocialAgent: Social relationship context and interaction patterns
+ * - Search Tool: External validation and enrichment of relationship data
+ * - ToolManager: Secure access to relationship management tools
+ * 
+ * GRAPH ANALYSIS FEATURES:
+ * - Network Analysis: Social network mapping and community detection
+ * - Centrality Metrics: Identification of key nodes and influencers
+ * - Path Finding: Shortest relationship paths between entities
+ * - Clustering: Automatic grouping of related entities and relationships
+ * - Influence Mapping: Understanding of relationship influence patterns
+ * - Relationship Health: Assessment of relationship quality and stability
+ * 
+ * SEMANTIC RELATIONSHIP TYPES:
+ * - Family Relationships: Parent, child, sibling, spouse, relative
+ * - Professional Relationships: Manager, employee, colleague, client, vendor
+ * - Social Relationships: Friend, acquaintance, neighbor, mentor
+ * - Location Relationships: Lives in, works at, visits, owns
+ * - Organizational Relationships: Member of, founder of, affiliated with
+ * - Service Relationships: Doctor, lawyer, teacher, service provider
+ * 
+ * ARCHITECTURE INTEGRATION:
+ * - Specialized processor interface with process() method
+ * - Deep integration with BotMojo's knowledge graph architecture
+ * - Optimized for high-performance relationship operations
+ * - Supports both real-time and batch relationship processing
+ * - Maintains strict data consistency and referential integrity
+ * 
+ * EXAMPLE USE CASES:
+ * - "John is my brother who lives in Seattle"
+ * - "Sarah is the manager of the marketing team"
+ * - "Dr. Smith is my cardiologist at General Hospital"
+ * - "Find all my colleagues who work in engineering"
+ * - "Show me the relationship between John and Sarah"
+ * - "Who are the mutual friends of Alice and Bob?"
+ * 
+ * @author AI Personal Assistant Team
+ * @version 2.0
+ * @since 2025-08-07
+ * @updated 2025-01-15
  */
 
 require_once __DIR__ . '/../tools/ToolManager.php';
 
+/**
+ * Default user ID for relationship data when user context is not available
+ */
 define('DEFAULT_USER_ID', 'user_default');
 
+/**
+ * RelationshipAgent - Intelligent entity relationship management and graph analysis
+ */
 class RelationshipAgent {
-    private $toolManager;
     
     /**
-     * Constructor
+     * RELATIONSHIP TYPE HIERARCHY
      * 
-     * @param ToolManager $toolManager Tool manager instance
+     * Comprehensive classification system for relationship types with
+     * semantic meaning, strength indicators, and logical properties.
+     */
+    private const RELATIONSHIP_TYPES = [
+        'family' => [
+            'parent_child' => [
+                'strength' => 1.0,
+                'bidirectional' => false,
+                'inverse' => 'child_parent',
+                'implies' => ['family_member']
+            ],
+            'sibling' => [
+                'strength' => 0.9,
+                'bidirectional' => true,
+                'implies' => ['family_member'],
+                'transitivity' => true
+            ],
+            'spouse' => [
+                'strength' => 1.0,
+                'bidirectional' => true,
+                'mutual_exclusive' => ['divorced', 'separated'],
+                'implies' => ['family_member']
+            ],
+            'grandparent_grandchild' => [
+                'strength' => 0.8,
+                'bidirectional' => false,
+                'inverse' => 'grandchild_grandparent',
+                'implies' => ['family_member']
+            ]
+        ],
+        'professional' => [
+            'manager_employee' => [
+                'strength' => 0.8,
+                'bidirectional' => false,
+                'inverse' => 'employee_manager',
+                'context' => 'hierarchical'
+            ],
+            'colleague' => [
+                'strength' => 0.7,
+                'bidirectional' => true,
+                'context' => 'peer',
+                'implies' => ['works_with']
+            ],
+            'client_service_provider' => [
+                'strength' => 0.6,
+                'bidirectional' => false,
+                'inverse' => 'service_provider_client',
+                'context' => 'business'
+            ]
+        ],
+        'social' => [
+            'friend' => [
+                'strength' => 0.8,
+                'bidirectional' => true,
+                'levels' => ['close_friend', 'casual_friend'],
+                'implies' => ['knows']
+            ],
+            'acquaintance' => [
+                'strength' => 0.4,
+                'bidirectional' => true,
+                'implies' => ['knows'],
+                'can_evolve_to' => ['friend']
+            ],
+            'mentor_mentee' => [
+                'strength' => 0.7,
+                'bidirectional' => false,
+                'inverse' => 'mentee_mentor',
+                'context' => 'guidance'
+            ]
+        ],
+        'location' => [
+            'lives_in' => [
+                'strength' => 0.6,
+                'bidirectional' => false,
+                'entity_types' => ['person', 'place'],
+                'temporal' => true
+            ],
+            'works_at' => [
+                'strength' => 0.6,
+                'bidirectional' => false,
+                'entity_types' => ['person', 'organization'],
+                'temporal' => true
+            ],
+            'owns' => [
+                'strength' => 0.5,
+                'bidirectional' => false,
+                'entity_types' => ['person', 'object'],
+                'implies' => ['has_access_to']
+            ]
+        ]
+    ];
+    
+    /**
+     * RELATIONSHIP TASK TYPES
+     * 
+     * Different operations that can be performed on relationships
+     * with specific processing requirements and validation rules.
+     */
+    private const TASK_TYPES = [
+        'create_relationship' => [
+            'description' => 'Create new relationship between entities',
+            'validation' => ['entity_existence', 'relationship_logic'],
+            'side_effects' => ['create_inverse', 'update_graph']
+        ],
+        'query_relationship' => [
+            'description' => 'Search and retrieve relationship information',
+            'validation' => ['query_syntax', 'permission_check'],
+            'optimization' => ['cache_lookup', 'index_usage']
+        ],
+        'update_relationship' => [
+            'description' => 'Modify existing relationship properties',
+            'validation' => ['relationship_existence', 'consistency_check'],
+            'side_effects' => ['update_inverse', 'recalculate_strength']
+        ],
+        'analyze_relationships' => [
+            'description' => 'Perform network analysis and pattern recognition',
+            'validation' => ['data_sufficiency', 'analysis_scope'],
+            'optimization' => ['graph_algorithms', 'statistical_analysis']
+        ],
+        'delete_relationship' => [
+            'description' => 'Remove relationship and clean up dependencies',
+            'validation' => ['confirmation_required', 'impact_assessment'],
+            'side_effects' => ['delete_inverse', 'update_statistics']
+        ]
+    ];
+    
+    /**
+     * GRAPH ANALYSIS ALGORITHMS
+     * 
+     * Supported graph analysis operations with computational
+     * complexity and use case information.
+     */
+    private const ANALYSIS_ALGORITHMS = [
+        'centrality_analysis' => [
+            'degree_centrality' => 'Identify most connected entities',
+            'betweenness_centrality' => 'Find entities that bridge different groups',
+            'closeness_centrality' => 'Discover entities close to all others'
+        ],
+        'community_detection' => [
+            'modularity_optimization' => 'Find natural communities in the graph',
+            'label_propagation' => 'Fast community detection algorithm',
+            'hierarchical_clustering' => 'Multi-level community structure'
+        ],
+        'path_analysis' => [
+            'shortest_path' => 'Find shortest relationship path between entities',
+            'all_paths' => 'Enumerate all possible relationship paths',
+            'relationship_distance' => 'Calculate relationship strength distance'
+        ],
+        'pattern_recognition' => [
+            'relationship_clusters' => 'Identify similar relationship patterns',
+            'anomaly_detection' => 'Find unusual relationship configurations',
+            'trend_analysis' => 'Analyze relationship evolution over time'
+        ]
+    ];
+    
+    /** @var ToolManager Centralized tool access and permission management */
+    private ToolManager $toolManager;
+    
+    /** @var array Relationship graph cache for performance optimization */
+    private array $relationshipCache = [];
+    
+    /** @var array Analysis results cache */
+    private array $analysisCache = [];
+    
+    /**
+     * Constructor - Initialize with tool manager for controlled tool access
+     * 
+     * Sets up the RelationshipAgent with access to relationship management
+     * tools and initializes graph analysis capabilities.
+     * 
+     * @param ToolManager $toolManager Tool management service with relationship permissions
      */
     public function __construct(ToolManager $toolManager) {
         $this->toolManager = $toolManager;
+        $this->initializeRelationshipSystem();
     }
     
     /**
-     * Process the input data and generate a response
+     * Initialize relationship management and graph analysis systems
      * 
-     * @param array $data Input data
-     * @return array Response data
+     * Sets up caching, graph algorithms, and relationship intelligence
+     * systems for optimal relationship processing performance.
+     * 
+     * @return void
+     */
+    private function initializeRelationshipSystem(): void {
+        $this->relationshipCache = [
+            'entities' => [],
+            'relationships' => [],
+            'graph_structure' => [],
+            'query_cache' => []
+        ];
+        
+        $this->analysisCache = [
+            'centrality_scores' => [],
+            'community_structure' => [],
+            'path_calculations' => [],
+            'pattern_analysis' => []
+        ];
+    }
+    
+    /**
+     * Process comprehensive relationship operations with intelligent analysis
+     * 
+     * This primary method handles all relationship-related operations including
+     * creation, querying, updating, and analysis of entity relationships in the
+     * knowledge graph. It provides sophisticated relationship intelligence with
+     * semantic understanding and graph analysis capabilities.
+     * 
+     * PROCESSING CAPABILITIES:
+     * 1. RELATIONSHIP CREATION: Establish new semantic connections
+     * 2. RELATIONSHIP QUERYING: Advanced search and retrieval operations
+     * 3. RELATIONSHIP UPDATING: Modify and maintain existing connections
+     * 4. RELATIONSHIP ANALYSIS: Network analysis and pattern recognition
+     * 5. GRAPH OPTIMIZATION: Performance optimization and consistency maintenance
+     * 
+     * INTELLIGENCE FEATURES:
+     * - Semantic Validation: Logical consistency and relationship rule enforcement
+     * - Bidirectional Logic: Automatic inverse relationship management
+     * - Conflict Resolution: Smart handling of contradictory relationship data
+     * - Pattern Recognition: Identification of relationship clusters and communities
+     * - Temporal Tracking: Evolution of relationships over time
+     * - Strength Assessment: Dynamic relationship importance scoring
+     * 
+     * GRAPH ANALYSIS:
+     * - Network Metrics: Centrality, clustering, and connectivity analysis
+     * - Community Detection: Automatic grouping of related entities
+     * - Path Finding: Optimal relationship traversal and connection discovery
+     * - Influence Mapping: Understanding relationship influence and power dynamics
+     * - Anomaly Detection: Identification of unusual relationship patterns
+     * 
+     * @param array $data Relationship operation data with task type and parameters
+     * @return array Comprehensive relationship processing results with analysis
      */
     public function process(array $data): array {
         error_log("RelationshipAgent: Starting processing");

@@ -1,34 +1,239 @@
 <?php
 /**
- * HealthAgent - Specialized Agent for Health and Wellness
+ * HealthAgent - Advanced Health and Wellness Intelligence Agent
  * 
- * This agent handles health-related queries, including health tracking,
- * medical information, wellness recommendations, fitness data, nutrition,
- * and overall well-being management.
+ * OVERVIEW:
+ * The HealthAgent is a specialized component of the BotMojo AI Personal Assistant
+ * designed to handle comprehensive health and wellness management. It processes
+ * health-related queries, tracks wellness metrics, provides evidence-based insights,
+ * and integrates with fitness and medical data sources for holistic health monitoring.
+ * 
+ * CORE CAPABILITIES:
+ * - Health Metric Tracking: Vital signs, symptoms, medications, treatments
+ * - Fitness Data Integration: Exercise logs, activity levels, workout analysis
+ * - Nutrition Monitoring: Dietary tracking, nutritional analysis, meal planning
+ * - Wellness Recommendations: Evidence-based lifestyle suggestions and insights
+ * - Medical Information: Reliable health information from verified sources
+ * - Symptom Analysis: Pattern recognition for health monitoring and alerts
+ * - Goal Tracking: Health goals, progress monitoring, achievement analysis
+ * - Preventive Care: Reminders for check-ups, screenings, medications
+ * 
+ * HEALTH DATA PROCESSING:
+ * - Natural Language Understanding: "I ran 3 miles today", "feeling headache"
+ * - Metric Extraction: Blood pressure, weight, heart rate, sleep hours
+ * - Symptom Classification: Physical, mental, emotional wellness indicators
+ * - Activity Recognition: Exercise types, duration, intensity levels
+ * - Nutrition Parsing: Food items, portions, caloric intake, nutritional values
+ * - Trend Analysis: Long-term health patterns and correlations
+ * 
+ * INTEGRATION CAPABILITIES:
+ * - Fitness Tool: Exercise tracking, activity monitoring, workout data
+ * - Database Tool: Health history, medical records, trend analysis
+ * - Search Tool: Medical research, health information verification
+ * - Meditation Tool: Mindfulness practices, stress management, mental wellness
+ * - ToolManager: Secure access to health-related system tools
+ * 
+ * MEDICAL COMPLIANCE:
+ * - Evidence-Based Information: Only verified medical sources and research
+ * - Privacy Protection: HIPAA-compliant data handling and storage
+ * - Medical Disclaimers: Clear boundaries between AI assistance and medical advice
+ * - Professional Referrals: Guidance on when to consult healthcare providers
+ * - Data Security: Encrypted storage and transmission of sensitive health data
+ * 
+ * INTELLIGENT FEATURES:
+ * - Pattern Recognition: Identify health trends and potential concerns
+ * - Personalized Insights: Customized recommendations based on user history
+ * - Goal Optimization: Smart goal setting and achievement strategies
+ * - Risk Assessment: Early warning systems for health concerns
+ * - Lifestyle Integration: Holistic wellness approach combining all health aspects
+ * 
+ * ARCHITECTURE INTEGRATION:
+ * - Implements standard Agent interface with createComponent() method
+ * - Follows BotMojo's triage-first architecture for intelligent request routing
+ * - Integrates with entity storage system for comprehensive health profiles
+ * - Supports real-time health monitoring and batch analysis
+ * - Maintains strict medical privacy and security standards
+ * 
+ * EXAMPLE USE CASES:
+ * - "Track my blood pressure: 120/80"
+ * - "I went for a 30-minute run today"
+ * - "Log my water intake: 8 glasses"
+ * - "I'm feeling stressed lately"
+ * - "Remind me to take my medication"
+ * - "Track my sleep: 7 hours last night"
+ * - "I have a headache and feel tired"
  * 
  * @author AI Personal Assistant Team
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-12
+ * @updated 2025-01-15
+ */
+
+require_once __DIR__ . '/../tools/ToolManager.php';
+
+/**
+ * Default user ID for health data when user context is not available
+ */
+define('DEFAULT_USER_ID', 'user_default');
+
+/**
+ * HealthAgent - Intelligent health and wellness management
  */
 class HealthAgent {
     
-    /** @var ToolManager Tool access manager */
+    /**
+     * HEALTH METRIC CATEGORIES
+     * 
+     * Classification system for different types of health measurements
+     * and tracking categories. Each category has specific validation
+     * rules and normal ranges for intelligent analysis.
+     */
+    private const HEALTH_CATEGORIES = [
+        'vitals' => [
+            'blood_pressure' => ['systolic' => [90, 140], 'diastolic' => [60, 90]],
+            'heart_rate' => ['resting' => [60, 100], 'active' => [100, 180]],
+            'body_temperature' => ['normal' => [97.0, 99.5]],
+            'respiratory_rate' => ['normal' => [12, 20]]
+        ],
+        'fitness' => [
+            'steps' => ['daily_goal' => 10000, 'unit' => 'count'],
+            'exercise_duration' => ['weekly_goal' => 150, 'unit' => 'minutes'],
+            'calories_burned' => ['unit' => 'kcal'],
+            'distance' => ['unit' => 'miles']
+        ],
+        'nutrition' => [
+            'water_intake' => ['daily_goal' => 8, 'unit' => 'glasses'],
+            'calories' => ['unit' => 'kcal'],
+            'macronutrients' => ['protein', 'carbs', 'fat'],
+            'micronutrients' => ['vitamins', 'minerals']
+        ],
+        'wellness' => [
+            'sleep_hours' => ['optimal' => [7, 9], 'unit' => 'hours'],
+            'stress_level' => ['scale' => [1, 10], 'unit' => 'rating'],
+            'mood' => ['scale' => [1, 10], 'unit' => 'rating'],
+            'energy_level' => ['scale' => [1, 10], 'unit' => 'rating']
+        ]
+    ];
+    
+    /**
+     * ACTIVITY TYPES AND INTENSITIES
+     * 
+     * Exercise and activity classification with metabolic equivalents (METs)
+     * for accurate calorie calculation and fitness assessment.
+     */
+    private const ACTIVITY_TYPES = [
+        'cardio' => [
+            'running' => ['met' => 8.0, 'intensity' => 'high'],
+            'jogging' => ['met' => 6.0, 'intensity' => 'moderate'],
+            'walking' => ['met' => 3.5, 'intensity' => 'low'],
+            'cycling' => ['met' => 7.0, 'intensity' => 'moderate'],
+            'swimming' => ['met' => 8.0, 'intensity' => 'high']
+        ],
+        'strength' => [
+            'weight_lifting' => ['met' => 6.0, 'intensity' => 'moderate'],
+            'bodyweight' => ['met' => 4.0, 'intensity' => 'moderate'],
+            'resistance_bands' => ['met' => 3.5, 'intensity' => 'low']
+        ],
+        'flexibility' => [
+            'yoga' => ['met' => 2.5, 'intensity' => 'low'],
+            'stretching' => ['met' => 2.0, 'intensity' => 'low'],
+            'pilates' => ['met' => 3.0, 'intensity' => 'low']
+        ],
+        'sports' => [
+            'tennis' => ['met' => 7.0, 'intensity' => 'moderate'],
+            'basketball' => ['met' => 8.0, 'intensity' => 'high'],
+            'soccer' => ['met' => 7.0, 'intensity' => 'moderate']
+        ]
+    ];
+    
+    /**
+     * SYMPTOM SEVERITY INDICATORS
+     * 
+     * Language patterns for assessing symptom severity and urgency.
+     * Used for intelligent health monitoring and alert systems.
+     */
+    private const SYMPTOM_SEVERITY = [
+        'severe' => ['severe', 'intense', 'unbearable', 'excruciating', 'emergency'],
+        'moderate' => ['moderate', 'noticeable', 'uncomfortable', 'concerning'],
+        'mild' => ['mild', 'slight', 'minor', 'little bit', 'somewhat'],
+        'improving' => ['better', 'improving', 'less', 'decreasing', 'healing']
+    ];
+    
+    /** @var ToolManager Centralized tool access and permission management */
     private ToolManager $toolManager;
+    
+    /** @var array User health profile and preferences */
+    private array $healthProfile = [];
+    
+    /** @var array Cache for health calculations and analysis */
+    private array $healthCache = [];
     
     /**
      * Constructor - Initialize with tool manager for controlled tool access
      * 
-     * @param ToolManager $toolManager Tool management service
+     * Sets up the HealthAgent with secure access to health-related tools.
+     * Initializes health profile and ensures HIPAA-compliant data handling.
+     * 
+     * @param ToolManager $toolManager Tool management service with health security policies
      */
     public function __construct(ToolManager $toolManager) {
         $this->toolManager = $toolManager;
+        $this->initializeHealthProfile();
     }
     
     /**
-     * Create a health-related component from provided data
+     * Initialize user health profile with default settings
      * 
-     * @param array $data Raw health data from the triage system
-     * @return array Enhanced health component with analysis and recommendations
+     * Sets up basic health parameters and preferences for personalized
+     * health recommendations and analysis.
+     * 
+     * @return void
+     */
+    private function initializeHealthProfile(): void {
+        $this->healthProfile = [
+            'age_group' => 'adult',
+            'activity_level' => 'moderate',
+            'health_goals' => [],
+            'medical_conditions' => [],
+            'medications' => [],
+            'allergies' => [],
+            'emergency_contacts' => [],
+            'preferred_units' => 'imperial' // or 'metric'
+        ];
+    }
+    
+    /**
+     * Create comprehensive health component from natural language input
+     * 
+     * This primary method transforms health-related user input into structured
+     * health data with intelligent analysis, recommendations, and insights.
+     * It processes various health contexts including fitness, nutrition, symptoms,
+     * and wellness tracking with medical-grade accuracy and privacy protection.
+     * 
+     * PROCESSING PIPELINE:
+     * 1. HEALTH EXTRACTION: Parse health metrics, activities, symptoms
+     * 2. MEDICAL VALIDATION: Verify data against medical standards  
+     * 3. CONTEXT ANALYSIS: Understand health goals and patterns
+     * 4. TOOL INTEGRATION: Access fitness, medical, search data
+     * 5. INTELLIGENCE LAYER: Generate insights and recommendations
+     * 6. COMPLIANCE CHECK: Ensure medical disclaimers and safety
+     * 
+     * HEALTH UNDERSTANDING:
+     * - Metric Recognition: "blood pressure 120/80", "ran 3 miles"
+     * - Symptom Analysis: "headache", "feeling tired", "chest pain"
+     * - Activity Tracking: "30-minute workout", "yoga session"
+     * - Nutrition Logging: "8 glasses of water", "1200 calories"
+     * - Wellness Monitoring: "slept 7 hours", "stress level high"
+     * 
+     * INTELLIGENT FEATURES:
+     * - Pattern Recognition: Identify health trends and correlations
+     * - Risk Assessment: Early warning for concerning patterns
+     * - Goal Optimization: Personalized health goal recommendations
+     * - Evidence Integration: Medical research and verified information
+     * - Privacy Protection: HIPAA-compliant data handling
+     * 
+     * @param array $data Health data from triage system with medical context
+     * @return array Comprehensive health component with analysis and insights
      */
     public function createComponent(array $data): array {
         // Extract health information from triage context

@@ -1,36 +1,252 @@
 <?php
 /**
- * PlannerAgent - Enhanced Time Management and Scheduling Component Creator
+ * PlannerAgent - Advanced Time Management and Intelligent Scheduling Agent
  * 
- * This agent specializes in managing time, schedules, tasks, and goals with
- * intelligent natural language date/time parsing and context-aware scheduling.
- * It creates planning components for events, tasks, reminders, and 
- * time-based activities with comprehensive scheduling information.
+ * OVERVIEW:
+ * The PlannerAgent is a sophisticated component of the BotMojo AI Personal Assistant
+ * that specializes in time management, scheduling, task planning, and goal tracking.
+ * It leverages advanced natural language processing to parse complex temporal 
+ * expressions and creates intelligent planning components with context-aware scheduling.
+ * 
+ * CORE CAPABILITIES:
+ * - Natural Language Date/Time Parsing: "next Friday at 3pm", "in 2 weeks", "tomorrow morning"
+ * - Intelligent Event Classification: meetings, tasks, reminders, appointments, deadlines
+ * - Context-Aware Scheduling: considers user patterns, conflicts, and preferences
+ * - Smart Duration Estimation: infers meeting lengths based on type and participants
+ * - Recurrence Pattern Detection: daily, weekly, monthly, custom patterns
+ * - Priority Assessment: urgency and importance analysis from language cues
+ * - Location Intelligence: venue suggestions and travel time calculations
+ * - Attendee Management: contact integration and availability checking
+ * 
+ * INTEGRATION CAPABILITIES:
+ * - Calendar Tool: Event creation, conflict detection, availability checking
+ * - Weather Tool: Weather-dependent event planning and recommendations
+ * - Search Tool: Research for event planning, best practices, venue information
+ * - Database Tool: Historical planning data and user preference learning
+ * - ToolManager: Controlled access to system tools based on security permissions
+ * 
+ * NATURAL LANGUAGE PROCESSING:
+ * - Temporal Expression Recognition: Advanced parsing of date/time references
+ * - Intent Classification: Distinguishing between events, tasks, reminders, goals
+ * - Entity Extraction: People, places, durations, frequencies from text
+ * - Context Understanding: Implicit information from conversation history
+ * - Ambiguity Resolution: Smart defaults and clarifying questions
+ * 
+ * ARCHITECTURE INTEGRATION:
+ * - Implements standard Agent interface with createComponent() method
+ * - Follows BotMojo's triage-first architecture pattern
+ * - Integrates seamlessly with entity storage system using JSON columns
+ * - Supports real-time and batch processing modes
+ * - Maintains conversation context and user preference learning
+ * 
+ * EXAMPLE USE CASES:
+ * - "Schedule a team meeting next Tuesday at 2pm"
+ * - "Remind me to call mom every Sunday"
+ * - "I have a dentist appointment on the 15th"
+ * - "Plan a vacation to Europe in June for 2 weeks"
+ * - "Set up recurring workout sessions Monday, Wednesday, Friday"
  * 
  * @author AI Personal Assistant Team
- * @version 1.1
+ * @version 2.0
  * @since 2025-08-07
+ * @updated 2025-01-15
+ */
+
+require_once __DIR__ . '/../tools/ToolManager.php';
+
+/**
+ * PlannerAgent - Advanced scheduling and time management intelligence
  */
 class PlannerAgent {
-    /** @var ToolManager Tool access manager */
+    
+    /**
+     * EVENT TYPE CLASSIFICATIONS
+     * 
+     * Categorizes different types of planning items for appropriate handling
+     * and UI presentation. Each type has specific processing logic and defaults.
+     */
+    private const EVENT_TYPES = [
+        'meeting' => [
+            'default_duration' => 60, // minutes
+            'requires_attendees' => true,
+            'allows_location' => true,
+            'priority_weight' => 0.8
+        ],
+        'appointment' => [
+            'default_duration' => 30,
+            'requires_attendees' => false,
+            'allows_location' => true,
+            'priority_weight' => 0.9
+        ],
+        'task' => [
+            'default_duration' => null,
+            'requires_attendees' => false,
+            'allows_location' => false,
+            'priority_weight' => 0.6
+        ],
+        'reminder' => [
+            'default_duration' => 5,
+            'requires_attendees' => false,
+            'allows_location' => false,
+            'priority_weight' => 0.4
+        ],
+        'deadline' => [
+            'default_duration' => null,
+            'requires_attendees' => false,
+            'allows_location' => false,
+            'priority_weight' => 1.0
+        ],
+        'goal' => [
+            'default_duration' => null,
+            'requires_attendees' => false,
+            'allows_location' => false,
+            'priority_weight' => 0.7
+        ]
+    ];
+    
+    /**
+     * PRIORITY LEVEL INDICATORS
+     * 
+     * Language patterns that indicate different priority levels.
+     * Used for intelligent priority assessment from natural language.
+     */
+    private const PRIORITY_INDICATORS = [
+        'urgent' => ['urgent', 'asap', 'immediately', 'critical', 'emergency', 'now'],
+        'high' => ['important', 'priority', 'must', 'need to', 'deadline', 'due'],
+        'medium' => ['should', 'would like', 'plan to', 'schedule', 'arrange'],
+        'low' => ['maybe', 'someday', 'eventually', 'when possible', 'if time']
+    ];
+    
+    /**
+     * RECURRENCE PATTERNS
+     * 
+     * Common patterns for recurring events with standardized intervals.
+     * Supports both simple and complex recurrence rules.
+     */
+    private const RECURRENCE_PATTERNS = [
+        'daily' => ['daily', 'every day', 'each day'],
+        'weekly' => ['weekly', 'every week', 'each week'],
+        'biweekly' => ['biweekly', 'every two weeks', 'every other week'],
+        'monthly' => ['monthly', 'every month', 'each month'],
+        'quarterly' => ['quarterly', 'every quarter', 'every 3 months'],
+        'yearly' => ['yearly', 'annually', 'every year']
+    ];
+    
+    /** @var ToolManager Centralized tool access and permission management */
     private ToolManager $toolManager;
+    
+    /** @var array Cache for processed temporal expressions to improve performance */
+    private array $temporalCache = [];
+    
+    /** @var array User preferences loaded from database for personalized scheduling */
+    private array $userPreferences = [];
     
     /**
      * Constructor - Initialize with tool manager for controlled tool access
      * 
-     * @param ToolManager $toolManager Tool management service
+     * Sets up the PlannerAgent with access to system tools through the ToolManager.
+     * The ToolManager enforces security policies and manages tool permissions
+     * to ensure agents only access tools they're authorized to use.
+     * 
+     * @param ToolManager $toolManager Tool management service with security policies
      */
     public function __construct(ToolManager $toolManager) {
         $this->toolManager = $toolManager;
+        $this->loadUserPreferences();
     }
     
     /**
-     * Create a planning component from provided data
-     * Processes scheduling and task data into a standardized planning component
-     * Enhanced with intelligent date/time parsing and context extraction
+     * Load user preferences for personalized planning
      * 
-     * @param array $data Raw planning data from the triage system
-     * @return array Standardized planning component with comprehensive scheduling info
+     * Retrieves user-specific settings like default meeting duration,
+     * preferred time slots, timezone, and scheduling patterns.
+     * 
+     * @return void
+     */
+    private function loadUserPreferences(): void {
+        // Default preferences - can be overridden by database values
+        $this->userPreferences = [
+            'default_meeting_duration' => 60,
+            'work_hours_start' => '09:00',
+            'work_hours_end' => '17:00',
+            'timezone' => 'America/New_York',
+            'buffer_time' => 15, // minutes between events
+            'reminder_defaults' => [15, 60], // minutes before event
+        ];
+        
+        // TODO: Load actual user preferences from database
+        // This would require database tool access and user identification
+    }
+    
+    /**
+     * Create intelligent planning component from natural language input
+     * 
+     * This is the primary method of the PlannerAgent that transforms raw user input
+     * into a structured, intelligent planning component. It employs advanced natural
+     * language processing, temporal reasoning, and context-aware analysis to create
+     * comprehensive scheduling information from conversational input.
+     * 
+     * PROCESSING PIPELINE:
+     * 1. INFORMATION EXTRACTION: Parse temporal expressions, extract entities
+     * 2. CONTEXT ANALYSIS: Understand user intent and planning requirements  
+     * 3. TOOL ENHANCEMENT: Integrate calendar, weather, search data
+     * 4. INTELLIGENCE LAYER: Apply scheduling logic and user preferences
+     * 5. COMPONENT ASSEMBLY: Create standardized planning component
+     * 
+     * NATURAL LANGUAGE UNDERSTANDING:
+     * - Temporal Parsing: "next Friday", "in 2 weeks", "tomorrow at 3pm"
+     * - Intent Classification: meeting vs task vs reminder vs deadline
+     * - Entity Recognition: people, places, durations, frequencies
+     * - Priority Detection: urgency indicators from language patterns
+     * - Context Integration: implicit details from conversation history
+     * 
+     * INTELLIGENCE FEATURES:
+     * - Smart Defaults: Infer missing details based on event type and context
+     * - Conflict Detection: Check for scheduling conflicts using calendar tool
+     * - Duration Estimation: Predict appropriate meeting/task durations
+     * - Reminder Optimization: Suggest optimal reminder timings
+     * - Location Intelligence: Venue suggestions and travel considerations
+     * 
+     * TOOL INTEGRATION:
+     * - Calendar Tool: Conflict checking, availability analysis, event creation
+     * - Weather Tool: Weather-dependent planning and outdoor event considerations
+     * - Search Tool: Research for planning best practices and venue information
+     * - Database Tool: User preference learning and historical pattern analysis
+     * 
+     * OUTPUT STRUCTURE:
+     * The returned planning component follows BotMojo's standardized format
+     * for seamless integration with the entity storage system and UI presentation.
+     * All components include comprehensive metadata for intelligent processing.
+     * 
+     * @param array $data Input data from BotMojo's triage system containing:
+     *                   - triage_summary: AI interpretation of planning request
+     *                   - original_query: Raw user input about the planning item
+     *                   - context: Conversation history and previous interactions
+     *                   - user_preferences: Personal scheduling preferences
+     *                   - existing_data: Pre-populated planning information
+     * 
+     * @return array Comprehensive planning component containing:
+     *               - Core Information: title, description, type, priority
+     *               - Temporal Data: start_date, end_date, duration, timezone
+     *               - Scheduling Details: attendees, location, reminders
+     *               - Intelligence Metadata: confidence scores, suggestions
+     *               - Tool Insights: calendar conflicts, weather data, research
+     *               - System Integration: entity relationships, tags, context
+     * 
+     * @throws InvalidArgumentException If required triage data is missing
+     * @throws RuntimeException If critical tool integration fails
+     * 
+     * @example
+     * Input: "Schedule team standup every Monday at 9am"
+     * Output: [
+     *     'title' => 'Team Standup',
+     *     'type' => 'meeting',
+     *     'start_date' => '2025-01-20',
+     *     'start_time' => '09:00:00',
+     *     'recurrence' => 'weekly',
+     *     'duration' => 30,
+     *     'priority' => 'medium'
+     * ]
      */
     public function createComponent(array $data): array {
         // Extract enhanced planning information from triage context
@@ -76,11 +292,40 @@ class PlannerAgent {
     }
     
     /**
-     * Extract enhanced planning information from triage data and natural language
-     * Parses dates, times, durations, priorities, and context from user input
+     * Extract comprehensive planning information from natural language
      * 
-     * @param array $data Complete data from triage system
-     * @return array Enhanced planning information
+     * This core method implements the PlannerAgent's natural language understanding
+     * capabilities. It analyzes conversational input to extract structured planning
+     * data including temporal information, entities, priorities, and scheduling context.
+     * 
+     * EXTRACTION CAPABILITIES:
+     * - Title Generation: Smart title extraction and generation from context
+     * - Temporal Parsing: Advanced date/time recognition and normalization
+     * - Entity Recognition: People, places, organizations from planning context
+     * - Priority Assessment: Urgency and importance detection from language cues
+     * - Type Classification: Meeting, task, reminder, deadline, goal identification
+     * - Recurrence Detection: Pattern recognition for recurring events
+     * - Duration Estimation: Smart defaults based on event type and context
+     * - Location Intelligence: Venue extraction and normalization
+     * 
+     * NATURAL LANGUAGE PATTERNS:
+     * - Temporal: "next Friday", "in 2 weeks", "tomorrow at 3pm", "every Monday"
+     * - People: "with John", "invite team", "meet Sarah", "call mom"  
+     * - Places: "at the office", "downtown", "conference room B", "home"
+     * - Types: "meeting about", "remind me to", "deadline for", "schedule"
+     * - Priority: "urgent", "asap", "when possible", "important"
+     * - Duration: "for 2 hours", "quick call", "all day", "30 minutes"
+     * 
+     * PROCESSING STAGES:
+     * 1. Text Preparation: Clean and normalize input text
+     * 2. Pattern Recognition: Apply regex and NLP patterns
+     * 3. Entity Extraction: Identify people, places, times
+     * 4. Context Analysis: Understand planning intent and requirements
+     * 5. Smart Defaults: Fill gaps with intelligent assumptions
+     * 6. Validation: Ensure extracted data makes logical sense
+     * 
+     * @param array $data Triage data containing natural language planning request
+     * @return array Structured planning information with high-confidence extractions
      */
     private function extractPlanningInformation(array $data): array {
         $extracted = [

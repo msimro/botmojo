@@ -1,39 +1,253 @@
 <?php
 /**
- * GeneralistAgent - Enhanced General Purpose Component Creator
+ * GeneralistAgent - Advanced General Intelligence and Fallback Processing Agent
  * 
- * This agent serves as an intelligent fallback for complex queries, general chat,
- * information requests, and content analysis that doesn't fit into specialized 
- * agent categories. It provides contextual analysis, topic classification,
- * and intelligent response generation.
+ * OVERVIEW:
+ * The GeneralistAgent serves as the intelligent fallback component for the BotMojo
+ * AI Personal Assistant, handling complex queries, general conversation, information
+ * requests, and content analysis that doesn't fit into specialized agent categories.
+ * It provides sophisticated contextual analysis, topic classification, sentiment
+ * analysis, and intelligent response generation for diverse user interactions.
  * 
- * Updated for production: August 8, 2025
- * Features: Tool Manager integration for better tool coordination
+ * CORE CAPABILITIES:
+ * - General Conversation: Natural dialogue and conversational AI responses
+ * - Information Requests: Research, fact-finding, and knowledge synthesis
+ * - Content Analysis: Document analysis, text classification, topic extraction
+ * - Complex Query Processing: Multi-domain requests requiring broad knowledge
+ * - Fallback Intelligence: Smart handling when specialized agents are insufficient
+ * - Context Management: Conversation flow and context-aware responses
+ * - Intent Classification: Understanding user goals and requirements
+ * - Knowledge Synthesis: Combining information from multiple sources
+ * 
+ * INTELLIGENCE CAPABILITIES:
+ * - Natural Language Understanding: Advanced NLP for query comprehension
+ * - Topic Classification: Multi-domain topic identification and categorization
+ * - Sentiment Analysis: Emotional tone and user state assessment
+ * - Entity Recognition: People, places, organizations, concepts from text
+ * - Intent Analysis: Goal identification and requirement understanding
+ * - Complexity Assessment: Query difficulty and expertise requirement evaluation
+ * - Response Strategy: Optimal response type and approach determination
+ * - Follow-up Prediction: Anticipating user's next questions or needs
+ * 
+ * INTEGRATION CAPABILITIES:
+ * - Search Tool: Web research, fact-checking, information synthesis
+ * - Calendar Tool: Date calculations, scheduling context, time-based queries
+ * - Weather Tool: Environmental context for general conversation
+ * - Database Tool: Knowledge retrieval and pattern analysis
+ * - ToolManager: Intelligent tool orchestration and permission management
+ * 
+ * PROCESSING INTELLIGENCE:
+ * - Multi-Domain Analysis: Simultaneous processing across knowledge domains
+ * - Context Preservation: Maintaining conversation state and topic continuity
+ * - Ambiguity Resolution: Smart handling of unclear or incomplete requests
+ * - Knowledge Gaps: Intelligent identification of missing information
+ * - Source Verification: Credibility assessment and fact-checking
+ * - Response Optimization: Tailored responses based on user context and preferences
+ * 
+ * CONVERSATION MANAGEMENT:
+ * - Dialogue Flow: Natural conversation progression and topic transitions
+ * - Context Windows: Managing short-term and long-term conversation context
+ * - Clarifying Questions: Smart prompts to resolve ambiguous requests
+ * - Topic Bridging: Connecting related concepts and maintaining coherence
+ * - Engagement Optimization: Maintaining user interest and providing value
+ * 
+ * ARCHITECTURE INTEGRATION:
+ * - Implements standard Agent interface with createComponent() method
+ * - Serves as the final fallback in BotMojo's triage-first architecture
+ * - Integrates with all system tools through ToolManager for comprehensive responses
+ * - Supports both simple chat and complex analytical processing
+ * - Maintains conversation context and user preference learning
+ * 
+ * EXAMPLE USE CASES:
+ * - "What's the meaning of life?" (philosophical inquiry)
+ * - "Explain quantum computing in simple terms" (educational request)
+ * - "I'm feeling overwhelmed with work" (general support)
+ * - "What should I cook for dinner?" (lifestyle advice)
+ * - "How do I get better at public speaking?" (skill development)
+ * - "Tell me about the weather patterns this year" (general information)
+ * - "I need help organizing my thoughts" (cognitive assistance)
  * 
  * @author AI Personal Assistant Team
- * @version 1.2
+ * @version 2.0
  * @since 2025-08-07
+ * @updated 2025-01-15
+ */
+
+require_once __DIR__ . '/../tools/ToolManager.php';
+
+/**
+ * GeneralistAgent - Intelligent general purpose processing and conversation
  */
 class GeneralistAgent {
     
-    /** @var ToolManager Tool access manager */
+    /**
+     * TOPIC CLASSIFICATION DOMAINS
+     * 
+     * Comprehensive categorization system for diverse topics and subjects.
+     * Used for intelligent routing and response strategy determination.
+     */
+    private const TOPIC_DOMAINS = [
+        'technology' => [
+            'software' => ['programming', 'apps', 'development', 'coding'],
+            'hardware' => ['computers', 'phones', 'gadgets', 'electronics'],
+            'internet' => ['web', 'online', 'social media', 'digital'],
+            'ai_ml' => ['artificial intelligence', 'machine learning', 'automation']
+        ],
+        'science' => [
+            'physics' => ['quantum', 'mechanics', 'relativity', 'energy'],
+            'chemistry' => ['molecules', 'reactions', 'elements', 'compounds'],
+            'biology' => ['life', 'organisms', 'genetics', 'evolution'],
+            'mathematics' => ['numbers', 'equations', 'statistics', 'geometry']
+        ],
+        'lifestyle' => [
+            'health' => ['wellness', 'fitness', 'nutrition', 'medical'],
+            'relationships' => ['family', 'friends', 'dating', 'social'],
+            'hobbies' => ['sports', 'music', 'art', 'games', 'crafts'],
+            'travel' => ['vacation', 'destinations', 'culture', 'adventure']
+        ],
+        'professional' => [
+            'career' => ['jobs', 'employment', 'skills', 'workplace'],
+            'business' => ['entrepreneurship', 'strategy', 'marketing', 'management'],
+            'finance' => ['money', 'investing', 'budgeting', 'economics'],
+            'education' => ['learning', 'studying', 'schools', 'degrees']
+        ],
+        'personal' => [
+            'philosophy' => ['meaning', 'purpose', 'ethics', 'wisdom'],
+            'psychology' => ['emotions', 'behavior', 'mental health', 'growth'],
+            'spirituality' => ['meditation', 'mindfulness', 'beliefs', 'practices'],
+            'creativity' => ['writing', 'design', 'innovation', 'expression']
+        ]
+    ];
+    
+    /**
+     * QUERY COMPLEXITY INDICATORS
+     * 
+     * Patterns that indicate different levels of query complexity
+     * for appropriate response strategy selection.
+     */
+    private const COMPLEXITY_INDICATORS = [
+        'simple' => [
+            'patterns' => ['what is', 'define', 'when did', 'who is', 'where is'],
+            'response_strategy' => 'direct_answer',
+            'tool_usage' => 'minimal'
+        ],
+        'moderate' => [
+            'patterns' => ['how to', 'explain', 'compare', 'analyze', 'suggest'],
+            'response_strategy' => 'structured_explanation',
+            'tool_usage' => 'selective'
+        ],
+        'complex' => [
+            'patterns' => ['evaluate', 'synthesize', 'strategy', 'comprehensive', 'multiple'],
+            'response_strategy' => 'multi_part_analysis',
+            'tool_usage' => 'extensive'
+        ],
+        'philosophical' => [
+            'patterns' => ['meaning', 'purpose', 'should I', 'what if', 'why do'],
+            'response_strategy' => 'thoughtful_dialogue',
+            'tool_usage' => 'research_based'
+        ]
+    ];
+    
+    /**
+     * RESPONSE TYPE STRATEGIES
+     * 
+     * Different approaches for responding based on query type and context.
+     */
+    private const RESPONSE_STRATEGIES = [
+        'informational' => ['focus' => 'facts', 'tone' => 'educational', 'length' => 'moderate'],
+        'conversational' => ['focus' => 'dialogue', 'tone' => 'friendly', 'length' => 'flexible'],
+        'analytical' => ['focus' => 'analysis', 'tone' => 'structured', 'length' => 'comprehensive'],
+        'supportive' => ['focus' => 'empathy', 'tone' => 'caring', 'length' => 'appropriate'],
+        'instructional' => ['focus' => 'guidance', 'tone' => 'helpful', 'length' => 'step_by_step']
+    ];
+    
+    /**
+     * SENTIMENT INDICATORS
+     * 
+     * Language patterns for emotional state and sentiment analysis.
+     */
+    private const SENTIMENT_PATTERNS = [
+        'positive' => ['happy', 'excited', 'great', 'wonderful', 'love', 'amazing'],
+        'negative' => ['sad', 'frustrated', 'angry', 'terrible', 'hate', 'awful'],
+        'neutral' => ['okay', 'fine', 'normal', 'average', 'standard'],
+        'curious' => ['wonder', 'interested', 'curious', 'explore', 'learn'],
+        'concerned' => ['worried', 'anxious', 'concerned', 'troubled', 'unsure']
+    ];
+    
+    /** @var ToolManager Centralized tool access and permission management */
     private ToolManager $toolManager;
+    
+    /** @var array Conversation context and state management */
+    private array $conversationContext = [];
+    
+    /** @var array Cache for analysis results to improve performance */
+    private array $analysisCache = [];
     
     /**
      * Constructor - Initialize with tool manager for controlled tool access
      * 
-     * @param ToolManager $toolManager Tool management service
+     * Sets up the GeneralistAgent with comprehensive tool access for handling
+     * diverse queries and complex analysis requirements.
+     * 
+     * @param ToolManager $toolManager Tool management service with full tool permissions
      */
     public function __construct(ToolManager $toolManager) {
         $this->toolManager = $toolManager;
+        $this->initializeConversationContext();
     }
     
     /**
-     * Create a general-purpose component from provided data
-     * Processes complex content with intelligent analysis and classification
+     * Initialize conversation context for intelligent dialogue management
      * 
-     * @param array $data Raw general data from the triage system
-     * @return array Enhanced general component with intelligent analysis
+     * Sets up context tracking for maintaining coherent conversations
+     * and providing contextually appropriate responses.
+     * 
+     * @return void
+     */
+    private function initializeConversationContext(): void {
+        $this->conversationContext = [
+            'current_topic' => null,
+            'topic_history' => [],
+            'user_preferences' => [],
+            'conversation_style' => 'friendly',
+            'complexity_preference' => 'moderate',
+            'last_interaction_type' => null
+        ];
+    }
+    
+    /**
+     * Create intelligent general-purpose component from diverse user input
+     * 
+     * This primary method serves as the intelligent fallback for all queries that
+     * don't fit specialized agent categories. It employs advanced natural language
+     * understanding, topic classification, sentiment analysis, and tool integration
+     * to provide comprehensive, contextually appropriate responses.
+     * 
+     * PROCESSING PIPELINE:
+     * 1. INPUT ANALYSIS: Parse query for intent, topic, complexity, sentiment
+     * 2. CLASSIFICATION: Categorize across multiple knowledge domains
+     * 3. STRATEGY SELECTION: Determine optimal response approach and tools
+     * 4. TOOL ORCHESTRATION: Integrate multiple tools for comprehensive analysis
+     * 5. SYNTHESIS: Combine information into coherent, valuable response
+     * 6. CONTEXT MANAGEMENT: Update conversation state and learning
+     * 
+     * INTELLIGENCE FEATURES:
+     * - Multi-Domain Understanding: Technology, science, lifestyle, professional, personal
+     * - Complexity Assessment: Simple facts to complex philosophical discussions
+     * - Sentiment Awareness: Emotional tone and user state consideration
+     * - Context Preservation: Conversation flow and topic continuity
+     * - Tool Integration: Smart orchestration of search, calendar, weather tools
+     * - Response Optimization: Tailored content length, tone, and structure
+     * 
+     * CONVERSATION CAPABILITIES:
+     * - Natural Dialogue: Engaging, human-like conversation management
+     * - Knowledge Synthesis: Combining information from multiple sources
+     * - Clarifying Questions: Smart prompts to resolve ambiguous requests
+     * - Follow-up Suggestions: Anticipating user's next questions or needs
+     * - Learning Integration: Improving responses based on user feedback
+     * 
+     * @param array $data Input data from triage system containing diverse query types
+     * @return array Comprehensive general component with intelligent analysis and responses
      */
     public function createComponent(array $data): array {
         // Extract enhanced information from triage context

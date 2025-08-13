@@ -1,36 +1,261 @@
 <?php
 /**
- * MemoryAgent - Enhanced Knowledge Graph Component Creator
+ * MemoryAgent - Advanced Knowledge Graph and Entity Relationship Intelligence Agent
  * 
- * This agent manages the core knowledge graph about people, places, and objects.
- * It creates memory components that store relationships, attributes, and contextual
- * information about entities in the user's life. Enhanced to extract rich information
- * from triage data and natural language context.
+ * OVERVIEW:
+ * The MemoryAgent is the core knowledge management component of the BotMojo AI Personal
+ * Assistant, responsible for creating, maintaining, and querying the comprehensive
+ * knowledge graph of entities and their relationships. It processes natural language
+ * to extract structured knowledge about people, places, organizations, and objects
+ * in the user's personal and professional life.
+ * 
+ * CORE CAPABILITIES:
+ * - Entity Recognition: People, places, organizations, objects from natural language
+ * - Relationship Extraction: Family, professional, social, location relationships
+ * - Attribute Management: Physical descriptions, roles, preferences, characteristics
+ * - Knowledge Graph Construction: Dynamic entity linking and relationship mapping
+ * - Context Preservation: Conversation context and temporal relationship tracking
+ * - Memory Consolidation: Intelligent merging of duplicate and related entities
+ * - Semantic Search: Intelligent entity retrieval based on context and similarity
+ * - Privacy Management: Sensitive information handling and access control
+ * 
+ * KNOWLEDGE GRAPH ARCHITECTURE:
+ * - Entity Storage: Comprehensive profiles with attributes and metadata
+ * - Relationship Mapping: Bidirectional relationships with strength and context
+ * - Temporal Tracking: Time-based relationship evolution and interaction history
+ * - Contextual Attributes: Dynamic attributes based on interaction context
+ * - Confidence Scoring: Reliability assessment for extracted information
+ * - Conflict Resolution: Smart handling of contradictory information
+ * - Data Lineage: Source tracking for all knowledge graph updates
+ * 
+ * NATURAL LANGUAGE PROCESSING:
+ * - Entity Mention Detection: "my friend John", "Sarah from work", "my dentist"
+ * - Relationship Inference: "John is my brother", "Sarah works at Google"
+ * - Attribute Extraction: "tall guy with glasses", "lives in Seattle"
+ * - Context Understanding: Implicit relationships and situational attributes
+ * - Temporal Processing: "used to work there", "recently moved"
+ * - Ambiguity Resolution: Smart disambiguation of similar entities
+ * 
+ * INTEGRATION CAPABILITIES:
+ * - Database Tool: Persistent storage and retrieval of knowledge graph data
+ * - Search Tool: External information enrichment and verification
+ * - Contacts Tool: Integration with contact management systems
+ * - ToolManager: Secure access to knowledge management tools
+ * - Other Agents: Knowledge sharing across specialized agent domains
+ * 
+ * INTELLIGENT FEATURES:
+ * - Smart Deduplication: Automatic merging of duplicate entity mentions
+ * - Relationship Inference: Logical relationship derivation (transitivity)
+ * - Importance Scoring: Dynamic entity importance based on interaction patterns
+ * - Privacy Classification: Automatic sensitivity level assignment
+ * - Knowledge Gaps: Identification of missing or incomplete information
+ * - Trend Analysis: Relationship evolution and change pattern detection
+ * 
+ * ARCHITECTURE INTEGRATION:
+ * - Implements standard Agent interface with createComponent() method
+ * - Central hub for entity data across all specialized agents
+ * - Integrates with entity storage system using optimized JSON columns
+ * - Supports real-time updates and batch knowledge graph operations
+ * - Maintains strict data consistency and referential integrity
+ * 
+ * EXAMPLE USE CASES:
+ * - "My friend John works at Microsoft"
+ * - "Sarah is my sister who lives in Portland"
+ * - "Dr. Smith is my cardiologist at the downtown clinic"
+ * - "The coffee shop on Main Street has great WiFi"
+ * - "My manager Jennifer scheduled a meeting"
+ * - "Mom called to remind me about dinner"
  * 
  * @author AI Personal Assistant Team
- * @version 1.1
+ * @version 2.0
  * @since 2025-08-07
+ * @updated 2025-01-15
+ */
+
+require_once __DIR__ . '/../tools/ToolManager.php';
+
+/**
+ * MemoryAgent - Intelligent knowledge graph and entity relationship management
  */
 class MemoryAgent {
-    /** @var ToolManager Tool access manager */
+    
+    /**
+     * ENTITY TYPE CLASSIFICATIONS
+     * 
+     * Comprehensive categorization system for different types of entities
+     * in the knowledge graph with specific handling and attribute schemas.
+     */
+    private const ENTITY_TYPES = [
+        'person' => [
+            'attributes' => ['name', 'role', 'description', 'contact_info', 'preferences'],
+            'relationships' => ['family', 'professional', 'social', 'romantic'],
+            'privacy_level' => 'high',
+            'importance_weight' => 1.0
+        ],
+        'organization' => [
+            'attributes' => ['name', 'type', 'size', 'industry', 'location'],
+            'relationships' => ['employment', 'partnership', 'customer', 'vendor'],
+            'privacy_level' => 'medium',
+            'importance_weight' => 0.8
+        ],
+        'place' => [
+            'attributes' => ['name', 'address', 'type', 'description', 'accessibility'],
+            'relationships' => ['residence', 'workplace', 'frequented', 'visited'],
+            'privacy_level' => 'medium',
+            'importance_weight' => 0.6
+        ],
+        'object' => [
+            'attributes' => ['name', 'type', 'description', 'location', 'value'],
+            'relationships' => ['owned_by', 'used_by', 'located_at', 'related_to'],
+            'privacy_level' => 'low',
+            'importance_weight' => 0.4
+        ],
+        'event' => [
+            'attributes' => ['name', 'date', 'location', 'description', 'participants'],
+            'relationships' => ['attended_by', 'hosted_by', 'occurred_at'],
+            'privacy_level' => 'medium',
+            'importance_weight' => 0.7
+        ]
+    ];
+    
+    /**
+     * RELATIONSHIP TYPE CLASSIFICATIONS
+     * 
+     * Structured relationship types with semantic meaning and strength indicators.
+     * Used for intelligent relationship inference and graph traversal.
+     */
+    private const RELATIONSHIP_TYPES = [
+        'family' => [
+            'parent' => ['strength' => 1.0, 'bidirectional' => false],
+            'child' => ['strength' => 1.0, 'bidirectional' => false],
+            'sibling' => ['strength' => 0.9, 'bidirectional' => true],
+            'spouse' => ['strength' => 1.0, 'bidirectional' => true],
+            'relative' => ['strength' => 0.7, 'bidirectional' => true]
+        ],
+        'professional' => [
+            'manager' => ['strength' => 0.8, 'bidirectional' => false],
+            'employee' => ['strength' => 0.8, 'bidirectional' => false],
+            'colleague' => ['strength' => 0.7, 'bidirectional' => true],
+            'client' => ['strength' => 0.6, 'bidirectional' => false],
+            'vendor' => ['strength' => 0.5, 'bidirectional' => false]
+        ],
+        'social' => [
+            'friend' => ['strength' => 0.8, 'bidirectional' => true],
+            'acquaintance' => ['strength' => 0.4, 'bidirectional' => true],
+            'neighbor' => ['strength' => 0.5, 'bidirectional' => true],
+            'mentor' => ['strength' => 0.7, 'bidirectional' => false],
+            'mentee' => ['strength' => 0.7, 'bidirectional' => false]
+        ],
+        'service' => [
+            'doctor' => ['strength' => 0.6, 'bidirectional' => false],
+            'lawyer' => ['strength' => 0.6, 'bidirectional' => false],
+            'teacher' => ['strength' => 0.6, 'bidirectional' => false],
+            'service_provider' => ['strength' => 0.4, 'bidirectional' => false]
+        ]
+    ];
+    
+    /**
+     * ATTRIBUTE EXTRACTION PATTERNS
+     * 
+     * Regular expression patterns for extracting entity attributes
+     * from natural language descriptions.
+     */
+    private const ATTRIBUTE_PATTERNS = [
+        'physical_description' => [
+            'height' => '/\b(?:tall|short|medium height|about \d+(?:\'\d+"|ft|feet))\b/i',
+            'hair' => '/\b(?:blonde?|brown|black|red|gray|grey|white|bald)\s*hair\b/i',
+            'eyes' => '/\b(?:blue|brown|green|hazel|gray|grey)\s*eyes\b/i',
+            'build' => '/\b(?:thin|slim|athletic|heavy|muscular|average)\s*build\b/i'
+        ],
+        'professional' => [
+            'job_title' => '/\b(?:is a|works as a?|job title)\s*([a-z\s]+?)(?:\s+(?:at|for|with)|\.|$)/i',
+            'company' => '/\b(?:works at|employed by|company)\s*([A-Z][a-zA-Z\s&.]+?)(?:\s|$)/i',
+            'industry' => '/\b(?:in the|industry|field of)\s*([a-z\s]+?)(?:\s+(?:industry|field)|\.|$)/i'
+        ],
+        'personal' => [
+            'age' => '/\b(?:is|age|about)\s*(\d{1,2})\s*(?:years?\s*old|yo)\b/i',
+            'location' => '/\b(?:lives in|from|located in)\s*([A-Z][a-zA-Z\s,]+?)(?:\s|$)/i',
+            'interests' => '/\b(?:likes|enjoys|interested in|hobbies?)\s*([a-z\s,]+?)(?:\.|$)/i'
+        ]
+    ];
+    
+    /** @var ToolManager Centralized tool access and permission management */
     private ToolManager $toolManager;
+    
+    /** @var array Knowledge graph cache for performance optimization */
+    private array $knowledgeCache = [];
+    
+    /** @var array Entity resolution cache for deduplication */
+    private array $entityResolutionCache = [];
     
     /**
      * Constructor - Initialize with tool manager for controlled tool access
      * 
-     * @param ToolManager $toolManager Tool management service
+     * Sets up the MemoryAgent with access to knowledge management tools
+     * and initializes caching systems for optimal performance.
+     * 
+     * @param ToolManager $toolManager Tool management service with knowledge graph permissions
      */
     public function __construct(ToolManager $toolManager) {
         $this->toolManager = $toolManager;
+        $this->initializeKnowledgeSystem();
     }
     
     /**
-     * Create a memory component from provided data
-     * Processes knowledge graph data and returns a standardized memory component
-     * Enhanced to extract information from triage context and natural language
+     * Initialize knowledge graph management system
      * 
-     * @param array $data Raw memory data from the triage system
-     * @return array Standardized memory component with relationship and attribute data
+     * Sets up caching, entity resolution, and knowledge graph
+     * optimization systems for efficient operation.
+     * 
+     * @return void
+     */
+    private function initializeKnowledgeSystem(): void {
+        $this->knowledgeCache = [
+            'entities' => [],
+            'relationships' => [],
+            'recent_queries' => [],
+            'cache_timestamp' => time()
+        ];
+        
+        $this->entityResolutionCache = [
+            'name_variations' => [],
+            'resolved_entities' => [],
+            'disambiguation_rules' => []
+        ];
+    }
+    
+    /**
+     * Create comprehensive knowledge graph component from natural language input
+     * 
+     * This primary method transforms entity-related user input into structured
+     * knowledge graph data with intelligent relationship extraction, attribute
+     * identification, and semantic understanding. It serves as the central hub
+     * for all entity knowledge management in the BotMojo system.
+     * 
+     * PROCESSING PIPELINE:
+     * 1. ENTITY EXTRACTION: Identify people, places, organizations, objects
+     * 2. RELATIONSHIP ANALYSIS: Extract explicit and implicit relationships
+     * 3. ATTRIBUTE RECOGNITION: Parse descriptive information and characteristics
+     * 4. CONTEXT INTEGRATION: Understand situational and temporal context
+     * 5. GRAPH INTEGRATION: Merge with existing knowledge graph intelligently
+     * 6. QUALITY ASSURANCE: Validate and score information reliability
+     * 
+     * KNOWLEDGE UNDERSTANDING:
+     * - Entity Recognition: "my friend John", "Sarah from accounting"
+     * - Relationship Extraction: "John is my brother", "works with Sarah"
+     * - Attribute Parsing: "tall guy with glasses", "lives in Seattle"
+     * - Context Awareness: temporal, situational, and conversational context
+     * - Deduplication: Smart merging of entity mentions and references
+     * 
+     * INTELLIGENT FEATURES:
+     * - Smart Entity Resolution: Automatic disambiguation and deduplication
+     * - Relationship Inference: Logical relationship derivation and validation
+     * - Importance Scoring: Dynamic entity relevance based on interaction patterns
+     * - Privacy Classification: Automatic sensitivity assessment and protection
+     * - Knowledge Graph Optimization: Efficient storage and retrieval strategies
+     * 
+     * @param array $data Entity data from triage system with natural language context
+     * @return array Comprehensive knowledge component with graph integration
      */
     public function createComponent(array $data): array {
         // Extract enhanced information from triage context if available

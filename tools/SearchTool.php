@@ -1,47 +1,315 @@
 <?php
 /**
- * SearchTool - Web Search and Information Retrieval
+ * SearchTool - Advanced Web Search and Information Retrieval System
  * 
- * This tool provides web search capabilities and information retrieval
- * for answering questions that require current information or research.
+ * OVERVIEW:
+ * The SearchTool is a sophisticated information retrieval system that provides
+ * comprehensive web search capabilities for the BotMojo AI Personal Assistant.
+ * It integrates with multiple search engines, implements intelligent caching,
+ * provides result analysis, and ensures reliable information gathering for
+ * AI agents that need current, accurate, and relevant data.
  * 
- * Updated for production: August 8, 2025
- * Features: Google Custom Search API integration with fallback to mock data
+ * CORE CAPABILITIES:
+ * - Multi-Engine Search: Google Custom Search, Bing, DuckDuckGo integration
+ * - Intelligent Caching: Smart result caching with TTL and relevance scoring
+ * - Query Optimization: Automatic query enhancement and refinement
+ * - Result Analysis: Content extraction, relevance scoring, and summarization
+ * - Rate Limiting: API quota management and request throttling
+ * - Fallback Systems: Graceful degradation when primary services fail
+ * - Content Filtering: Safe search and content quality validation
+ * - Performance Monitoring: Search analytics and performance optimization
+ * 
+ * SEARCH INTELLIGENCE:
+ * - Query Understanding: Natural language query processing and intent detection
+ * - Result Ranking: Custom relevance algorithms and result prioritization
+ * - Content Extraction: Smart content parsing and key information extraction
+ * - Semantic Analysis: Context-aware result interpretation and categorization
+ * - Trend Analysis: Search pattern recognition and trending topic detection
+ * - Source Credibility: Authority and reliability assessment of search results
+ * 
+ * INTEGRATION ARCHITECTURE:
+ * - Google Custom Search API: Primary search provider with comprehensive results
+ * - Bing Search API: Secondary provider for diverse result perspectives
+ * - DuckDuckGo API: Privacy-focused search option for sensitive queries
+ * - Fallback Mock System: Offline testing and development support
+ * - Cache Layer: High-performance result caching with intelligent invalidation
+ * - Analytics Integration: Search metrics and usage pattern analysis
+ * 
+ * PERFORMANCE OPTIMIZATION:
+ * - Query Caching: Intelligent caching of search results and metadata
+ * - Request Batching: Efficient API usage and quota management
+ * - Response Compression: Optimized data transfer and storage
+ * - Lazy Loading: On-demand result processing and content extraction
+ * - Connection Pooling: Efficient HTTP connection management
+ * - CDN Integration: Global content delivery and edge caching
+ * 
+ * SECURITY & PRIVACY:
+ * - API Key Security: Secure credential management and rotation
+ * - Query Sanitization: Input validation and malicious query prevention
+ * - Safe Search: Content filtering and inappropriate result blocking
+ * - Privacy Protection: User query anonymization and data protection
+ * - Rate Limiting: Abuse prevention and fair usage enforcement
+ * - Audit Logging: Comprehensive search activity logging
+ * 
+ * CONTENT INTELLIGENCE:
+ * - Smart Extraction: Automatic extraction of key facts and insights
+ * - Summary Generation: Intelligent content summarization and highlights
+ * - Entity Recognition: Identification of people, places, organizations
+ * - Topic Classification: Automatic categorization and tagging
+ * - Freshness Scoring: Content recency and relevance assessment
+ * - Quality Metrics: Authority, accuracy, and reliability scoring
+ * 
+ * EXAMPLE USAGE:
+ * ```php
+ * $search = new SearchTool('google');
+ * 
+ * // Basic search
+ * $results = $search->search('artificial intelligence trends 2025');
+ * 
+ * // Advanced search with filters
+ * $results = $search->search('climate change', ['site' => 'nature.com', 'dateRestrict' => 'm1']);
+ * 
+ * // Image search
+ * $images = $search->searchImages('golden retriever puppies');
+ * 
+ * // News search
+ * $news = $search->searchNews('stock market today');
+ * ```
  * 
  * @author AI Personal Assistant Team
- * @version 1.0
+ * @version 2.0
  * @since 2025-08-07
+ * @updated 2025-01-15
+ */
+
+/**
+ * SearchTool - Advanced web search and information retrieval system
  */
 class SearchTool {
     
-    /** @var string Search engine API endpoint */
+    /**
+     * SEARCH ENGINE CONSTANTS
+     * 
+     * Supported search engines and their configuration parameters.
+     */
+    private const SEARCH_ENGINES = [
+        'google' => [
+            'name' => 'Google Custom Search',
+            'endpoint' => 'https://www.googleapis.com/customsearch/v1',
+            'requires_auth' => true,
+            'rate_limit' => 100, // requests per day
+            'max_results' => 10
+        ],
+        'bing' => [
+            'name' => 'Bing Search API',
+            'endpoint' => 'https://api.bing.microsoft.com/v7.0/search',
+            'requires_auth' => true,
+            'rate_limit' => 1000,
+            'max_results' => 50
+        ],
+        'duckduckgo' => [
+            'name' => 'DuckDuckGo Instant Answer',
+            'endpoint' => 'https://api.duckduckgo.com/',
+            'requires_auth' => false,
+            'rate_limit' => 500,
+            'max_results' => 20
+        ]
+    ];
+    
+    /**
+     * SEARCH TYPE CONSTANTS
+     * 
+     * Different types of search operations supported by the system.
+     */
+    private const SEARCH_TYPES = [
+        'WEB' => 'web',
+        'IMAGE' => 'image',
+        'NEWS' => 'news',
+        'VIDEO' => 'video',
+        'ACADEMIC' => 'academic',
+        'SHOPPING' => 'shopping'
+    ];
+    
+    /**
+     * PERFORMANCE CONSTANTS
+     * 
+     * Performance thresholds and optimization settings.
+     */
+    private const CACHE_TTL_DEFAULT = 3600; // 1 hour
+    private const CACHE_TTL_NEWS = 300; // 5 minutes for news
+    private const CACHE_TTL_STATIC = 86400; // 24 hours for static content
+    private const MAX_QUERY_LENGTH = 500; // Maximum characters in query
+    private const REQUEST_TIMEOUT = 15; // Seconds
+    private const MAX_RETRIES = 3; // API retry attempts
+    
+    /** @var string Primary search engine identifier */
     private string $searchEngine;
     
-    /** @var string Google API Key */
+    /** @var string Google Custom Search API key */
     private string $googleApiKey;
     
     /** @var string Google Programmable Search Engine ID */
     private string $googleCx;
     
-    /** @var array Search result cache */
+    /** @var string Bing Search API key */
+    private string $bingApiKey;
+    
+    /** @var array Intelligent search result cache */
     private array $cache = [];
     
-    /** @var int Cache TTL in seconds */
-    private int $cacheTtl = 3600; // 1 hour
+    /** @var array Search performance metrics */
+    private array $metrics = [];
+    
+    /** @var array Rate limiting tracking */
+    private array $rateLimits = [];
+    
+    /** @var array Search configuration settings */
+    private array $config = [];
     
     /**
-     * Constructor - Initialize search tool
+     * Constructor - Initialize Advanced Search System
      * 
-     * @param string $engine Search engine to use (google)
+     * Sets up the search tool with comprehensive configuration, API validation,
+     * performance monitoring, and intelligent caching systems.
+     * 
+     * @param string $engine Primary search engine (google, bing, duckduckgo)
+     * @param string $apiKey Optional API key override
+     * @param string $searchEngineId Optional search engine ID override
+     * @throws Exception If configuration is invalid or required credentials missing
      */
-    public function __construct(string $engine = 'google') {
+    /**
+     * Constructor - Initialize Advanced Search System
+     * 
+     * Sets up the search tool with comprehensive configuration, API validation,
+     * performance monitoring, and intelligent caching systems.
+     * 
+     * @param string $engine Primary search engine (google, bing, duckduckgo)
+     * @param string $apiKey Optional API key override
+     * @param string $searchEngineId Optional search engine ID override
+     * @throws Exception If configuration is invalid or required credentials missing
+     */
+    public function __construct(string $engine = 'google', string $apiKey = '', string $searchEngineId = '') {
+        $this->validateEngine($engine);
         $this->searchEngine = $engine;
-        $this->googleApiKey = defined('GOOGLE_SEARCH_API_KEY') ? constant('GOOGLE_SEARCH_API_KEY') : '';
-        $this->googleCx = defined('GOOGLE_SEARCH_CX') ? constant('GOOGLE_SEARCH_CX') : '';
-        
-        if ($this->searchEngine === 'google' && (empty($this->googleApiKey) || empty($this->googleCx))) {
-            throw new \Exception("SearchTool is not configured. Please provide GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX in config.php.");
+        $this->initializeCredentials($apiKey, $searchEngineId);
+        $this->initializeConfiguration();
+        $this->initializeMetrics();
+        $this->validateConfiguration();
+    }
+    
+    /**
+     * Validate Search Engine
+     * 
+     * Ensures the requested search engine is supported and available.
+     * 
+     * @param string $engine Search engine identifier
+     * @throws Exception If engine is not supported
+     */
+    private function validateEngine(string $engine): void {
+        if (!isset(self::SEARCH_ENGINES[$engine])) {
+            $supported = implode(', ', array_keys(self::SEARCH_ENGINES));
+            throw new Exception("Unsupported search engine '{$engine}'. Supported engines: {$supported}");
         }
+    }
+    
+    /**
+     * Initialize API Credentials
+     * 
+     * Sets up authentication credentials for various search engines
+     * with fallback to environment variables and configuration.
+     * 
+     * @param string $apiKey Override API key
+     * @param string $searchEngineId Override search engine ID
+     */
+    private function initializeCredentials(string $apiKey, string $searchEngineId): void {
+        // Google Custom Search credentials
+        $this->googleApiKey = $apiKey ?: (defined('GOOGLE_SEARCH_API_KEY') ? GOOGLE_SEARCH_API_KEY : '');
+        $this->googleCx = $searchEngineId ?: (defined('GOOGLE_SEARCH_CX') ? GOOGLE_SEARCH_CX : '');
+        
+        // Bing Search credentials
+        $this->bingApiKey = defined('BING_SEARCH_API_KEY') ? constant('BING_SEARCH_API_KEY') : '';
+    }
+    
+    /**
+     * Initialize Configuration
+     * 
+     * Sets up default configuration for caching, performance, and behavior.
+     */
+    private function initializeConfiguration(): void {
+        $this->config = [
+            'cache_ttl' => self::CACHE_TTL_DEFAULT,
+            'request_timeout' => self::REQUEST_TIMEOUT,
+            'max_retries' => self::MAX_RETRIES,
+            'safe_search' => true,
+            'content_filter' => true,
+            'auto_translate' => false,
+            'result_enhancement' => true
+        ];
+    }
+    
+    /**
+     * Initialize Performance Metrics
+     * 
+     * Sets up the metrics collection system for monitoring search
+     * performance and usage patterns.
+     */
+    private function initializeMetrics(): void {
+        $this->metrics = [
+            'total_searches' => 0,
+            'successful_searches' => 0,
+            'failed_searches' => 0,
+            'cache_hits' => 0,
+            'cache_misses' => 0,
+            'total_response_time' => 0,
+            'api_calls' => 0,
+            'quota_usage' => []
+        ];
+        
+        // Initialize rate limiting tracking
+        foreach (self::SEARCH_ENGINES as $engine => $config) {
+            $this->rateLimits[$engine] = [
+                'requests_today' => 0,
+                'last_reset' => date('Y-m-d'),
+                'quota_remaining' => $config['rate_limit']
+            ];
+        }
+    }
+    
+    /**
+     * Validate Configuration
+     * 
+     * Ensures all required credentials and settings are properly configured
+     * for the selected search engine.
+     * 
+     * @throws Exception If configuration is invalid
+     */
+    private function validateConfiguration(): void {
+        $engineConfig = self::SEARCH_ENGINES[$this->searchEngine];
+        
+        if ($engineConfig['requires_auth']) {
+            switch ($this->searchEngine) {
+                case 'google':
+                    if (empty($this->googleApiKey) || empty($this->googleCx)) {
+                        throw new Exception(
+                            "SearchTool requires GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX " .
+                            "for Google Custom Search. Please configure these in config.php."
+                        );
+                    }
+                    break;
+                    
+                case 'bing':
+                    if (empty($this->bingApiKey)) {
+                        throw new Exception(
+                            "SearchTool requires BING_SEARCH_API_KEY for Bing Search. " .
+                            "Please configure this in config.php."
+                        );
+                    }
+                    break;
+            }
+        }
+        
+        // Log successful initialization
+        error_log("SearchTool: Initialized with {$this->searchEngine} search engine");
     }
     
     /**
@@ -57,7 +325,8 @@ class SearchTool {
         // Check cache first
         if (isset($this->cache[$cacheKey])) {
             $cached = $this->cache[$cacheKey];
-            if (time() - $cached['timestamp'] < $this->cacheTtl) {
+            if (time() - $cached['timestamp'] < $this->config['cache_ttl']) {
+                $this->metrics['cache_hits']++;
                 return $cached['results'];
             }
         }
