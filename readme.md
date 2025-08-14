@@ -2,6 +2,8 @@
 
 **Intelligent, modular, multi-agent personal assistant with enhanced AI capabilities**
 
+> 💡 **For Developers**: Check out [.github/copilot-instructions.md](.github/copilot-instructions.md) for project architecture and development guidelines.
+
 ## 🚀 Quick Start (DDEV)
 
 ### 1. DDEV Setup
