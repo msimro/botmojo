@@ -46,6 +46,31 @@ class HistoryTool extends AbstractTool
     private ?string $conversationId = null;
     
     /**
+     * Database tool for entity storage
+     *
+     * @var DatabaseTool
+     */
+    private DatabaseTool $dbTool;
+    
+    /**
+     * Constructor
+     *
+     * @param DatabaseTool $dbTool The database tool for storage
+     * @param array<string, mixed> $config Configuration options
+     */
+    public function __construct(DatabaseTool $dbTool, array $config = [])
+    {
+        $this->dbTool = $dbTool;
+        
+        // Set default cache directory if not provided
+        if (!isset($config['cache_dir'])) {
+            $config['cache_dir'] = defined('CACHE_DIR') ? CACHE_DIR : __DIR__ . '/../../cache';
+        }
+        
+        parent::__construct($config);
+    }
+    
+    /**
      * Validate the configuration
      *
      * Ensure that all required configuration parameters are present.

@@ -15,7 +15,12 @@ namespace BotMojo\Tools;
 
 use BotMojo\Core\AbstractTool;
 use BotMojo\Exceptions\BotMojoException;
+use BotMojo\Exceptions\ApiException;
+use BotMojo\Exceptions\ConfigurationException;
+use BotMojo\Core\LoggerService;
 use Exception;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 
 /**
  * Gemini Tool
@@ -59,6 +64,26 @@ class GeminiTool extends AbstractTool
     private const REQUIRED_CONFIG = ['api_key'];
     
     /**
+     * Logger service
+     */
+    private LoggerService $logger;
+    
+    /**
+     * Initialize the tool with configuration
+     *
+     * @param array<string, mixed> $config Configuration parameters
+     */
+    public function initialize(array $config): void
+    {
+        parent::initialize($config);
+        
+        // Initialize logger
+        $this->logger = new LoggerService('GeminiTool');
+        
+        $this->validateConfig();
+    }
+    
+    /**
      * Validate the configuration
      *
      * Ensure that all required configuration parameters are present.
@@ -68,23 +93,44 @@ class GeminiTool extends AbstractTool
      */
     protected function validateConfig(): void
     {
+        // Check for API key in configuration or environment constants
+        if (!isset($this->config['api_key']) || empty($this->config['api_key'])) {
+            // Check if the API key is defined as a constant in config.php
+            if (defined('GEMINI_API_KEY') && !empty(GEMINI_API_KEY)) {
+                $this->config['api_key'] = GEMINI_API_KEY;
+                
+                $this->logger->info('Using API key from GEMINI_API_KEY constant');
+            }
+        }
+        
+        // Now proceed with normal validation
+        $missingKeys = [];
+        
         foreach (self::REQUIRED_CONFIG as $key) {
             if (!isset($this->config[$key]) || empty($this->config[$key])) {
                 // Special handling for development environments
                 if (defined('DEBUG_MODE') && DEBUG_MODE && $key === 'api_key') {
                     // In debug mode, we'll allow a placeholder for development
                     if ($this->config[$key] === 'placeholder-api-key-for-development') {
-                        error_log("⚠️ Using placeholder Gemini API key. Content generation will be simulated.");
+                        $this->logger->warning("Using placeholder Gemini API key. Content generation will be simulated.");
                         // Continue with validation
                         continue;
                     }
                 }
                 
-                throw new BotMojoException(
-                    "Missing required configuration: {$key}",
-                    ['tool' => 'GeminiTool']
-                );
+                $missingKeys[] = $key;
             }
+        }
+        
+        if (!empty($missingKeys)) {
+            $message = "Missing required configuration: " . implode(', ', $missingKeys);
+            $this->logger->error($message, ['tool' => 'GeminiTool', 'missing_keys' => $missingKeys]);
+            
+            throw new ConfigurationException(
+                $message,
+                $missingKeys,
+                ['tool' => 'GeminiTool']
+            );
         }
     }
     
@@ -191,43 +237,61 @@ class GeminiTool extends AbstractTool
         ]);
         
         try {
-            // Initialize cURL session
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Content-Type: application/json'
+            // Use Guzzle HTTP client
+            $client = new Client([
+                'timeout' => 30,
+                'connect_timeout' => 10,
+                'http_errors' => false,
             ]);
             
             // Execute the request
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
+            $response = $client->post($url, [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ],
+                'body' => $payload
+            ]);
             
-            // Handle connection errors
-            if ($curlError) {
-                throw new BotMojoException(
-                    "CURL error: " . $curlError,
-                    ['url' => $apiUrl]
-                );
-            }
+            // Get response data
+            $httpCode = $response->getStatusCode();
+            $responseBody = $response->getBody()->getContents();
             
             // Handle HTTP errors
             if ($httpCode !== 200) {
-                if (defined('DEBUG_MODE') && DEBUG_MODE) {
-                    error_log("❌ Gemini API error. Response: " . $response);
+                // Debug information is always useful here
+                error_log("❌ Gemini API error. HTTP Code: " . $httpCode);
+                error_log("❌ Response: " . $responseBody);
+                error_log("❌ API Key used: " . substr($apiKey, 0, 5) . "..." . substr($apiKey, -5));
+                error_log("❌ Model: " . $modelName);
+                
+                // Try to parse the error response
+                $errorData = json_decode($responseBody, true);
+                $errorMessage = "HTTP code {$httpCode}";
+                
+                if (is_array($errorData) && isset($errorData['error'])) {
+                    if (isset($errorData['error']['message'])) {
+                        $errorMessage = $errorData['error']['message'];
+                    }
+                    
+                    if (isset($errorData['error']['status'])) {
+                        $errorMessage .= " (Status: " . $errorData['error']['status'] . ")";
+                    }
                 }
                 
                 throw new BotMojoException(
-                    "Gemini API error: HTTP code {$httpCode}",
-                    ['response' => $response, 'model' => $modelName]
+                    "Gemini API error: " . $errorMessage,
+                    [
+                        'response' => $responseBody, 
+                        'model' => $modelName,
+                        'http_code' => $httpCode,
+                        'api_key_valid' => !empty($apiKey)
+                    ]
                 );
             }
             
             // Parse and extract response
-            $data = json_decode($response, true);
+            $data = json_decode($responseBody, true);
             
             if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
                 $text = $data['candidates'][0]['content']['parts'][0]['text'];
@@ -241,12 +305,23 @@ class GeminiTool extends AbstractTool
             
             // Handle unexpected response format
             if (defined('DEBUG_MODE') && DEBUG_MODE) {
-                error_log("❓ Unexpected Gemini API response format: " . $response);
+                error_log("❓ Unexpected Gemini API response format: " . $responseBody);
             }
             
             throw new BotMojoException(
                 "Unexpected Gemini API response format",
-                ['response' => $response, 'model' => $modelName]
+                ['response' => $responseBody, 'model' => $modelName]
+            );
+            
+        } catch (RequestException $e) {
+            // Handle Guzzle-specific exceptions
+            if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                error_log("❌ Guzzle request error: " . $e->getMessage());
+            }
+            
+            throw new BotMojoException(
+                "Failed to connect to Gemini API: " . $e->getMessage(),
+                ['url' => $url, 'model' => $modelName]
             );
             
         } catch (Exception $e) {

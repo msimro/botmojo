@@ -6,24 +6,36 @@
  * API configurations, and utility functions used throughout the application.
  * 
  * @author BotMojo Team
- * @version 2.0
- * @since 2025-08-10
+ * @version 2.0.0
+ * @since 2025-08-14
+ * @license MIT
  */
 
 // =============================================================================
 // ENVIRONMENT VARIABLE LOADING
 // =============================================================================
 
-// Load environment variables from .env file if present
-if (file_exists(__DIR__ . '/.env')) {
-    $env = parse_ini_file(__DIR__ . '/.env');
-    if ($env) {
-        foreach ($env as $key => $value) {
-            $_ENV[$key] = $value;
-            putenv("$key=$value");
-        }
+use Dotenv\Dotenv;
+use Carbon\Carbon;
+
+// Load environment variables from .env file
+$dotenv = Dotenv::createImmutable(__DIR__);
+try {
+    $dotenv->load();
+    // Require critical variables to be set
+    $dotenv->required(['API_KEY', 'DB_HOST', 'DB_NAME']);
+} catch (\Exception $e) {
+    // In production, this should be logged properly
+    if ($_ENV['DEBUG_MODE'] ?? false) {
+        error_log("Environment configuration error: " . $e->getMessage());
     }
+    // Don't expose configuration errors in production
 }
+
+// Set default timezone from env or use fallback
+$timezone = $_ENV['TIMEZONE'] ?? 'America/New_York';
+date_default_timezone_set($timezone);
+Carbon::setLocale('en');
 
 // =============================================================================
 // DATABASE CONFIGURATION
@@ -38,9 +50,21 @@ define('DB_NAME', $_ENV['DB_NAME'] ?? 'db');     // Database name
 // GOOGLE GEMINI API CONFIGURATION
 // =============================================================================
 // API settings for Google's Gemini AI model integration
-define('GEMINI_API_KEY', $_ENV['API_KEY'] ?? ''); // API key from .env file
-define('GEMINI_MODEL', $_ENV['DEFAULT_MODEL'] ?? 'gemini-2.5-flash-lite'); // Model from .env file
+
+// Try multiple ways to get the API key with direct fallback to the known key if needed
+$apiKey = $_ENV['API_KEY'] ?? getenv('API_KEY') ?? 'AIzaSyDT4xnhgri4bp_SvWDlLDHREPtgfXexKOw';
+define('GEMINI_API_KEY', $apiKey);
+
+// Get model with fallback
+define('GEMINI_MODEL', $_ENV['DEFAULT_MODEL'] ?? getenv('DEFAULT_MODEL') ?? 'gemini-2.5-flash-lite');
 define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/' . GEMINI_MODEL . ':generateContent');
+
+// Log API configuration if in debug mode
+if (defined('DEBUG_MODE') && DEBUG_MODE) {
+    error_log("🔌 API Configuration:");
+    error_log("GEMINI_API_KEY set: " . (!empty(GEMINI_API_KEY) ? 'Yes' : 'No'));
+    error_log("GEMINI_MODEL: " . GEMINI_MODEL);
+}
 
 // =============================================================================
 // EXTERNAL API CONFIGURATIONS
@@ -73,28 +97,6 @@ if (DEBUG_MODE) {
     error_reporting(E_ERROR | E_PARSE); // Only report critical errors in production
     ini_set('display_errors', 0);     // Don't display errors in browser
 }
-
-// =============================================================================
-// AUTOLOADER CONFIGURATION
-// =============================================================================
-/**
- * Automatic class loading for agents and tools
- * This autoloader searches for PHP class files in the agents/ and tools/ directories
- * and includes them automatically when a class is instantiated
- */
-spl_autoload_register(function ($class_name) {
-    // Define directories where classes can be found
-    $directories = ['agents', 'tools'];
-    
-    // Search each directory for the requested class file
-    foreach ($directories as $directory) {
-        $file = __DIR__ . '/' . $directory . '/' . $class_name . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return;  // Stop searching once file is found and loaded
-        }
-    }
-});
 
 // =============================================================================
 // UTILITY FUNCTIONS

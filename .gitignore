@@ -1,13 +1,71 @@
+# OS generated files
 .DS_Store
-.ddev
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor folders
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+.phpstorm.meta.php
+_ide_helper.php
+.phpunit.result.cache
+
+# Development environment
 .ddev/
-.ddev/*
-.vscode
-.idea
-.github
+.docker/
+docker-compose.override.yml
 
-# Cache directory - contains conversation history files
-cache/
-cache/*
+# Composer dependencies
+/vendor/
+composer.lock
 
-mdo
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Application logs and cache
+/logs/
+/cache/
+*.log
+*.cache
+
+# Temporary and runtime files
+/tmp/
+/temp/
+/storage/logs/
+/storage/cache/
+
+# Build directories
+/build/
+/dist/
+/node_modules/
+
+# Test files (keep these out of production)
+test_*.php
+*_test.php
+tests/temp/
+
+# GitHub specific
+.github/
+
+# Custom BotMojo directories
+/mdo/
+
+# Database files (if using SQLite)
+*.sqlite
+*.db3
+
+# Other common exclusions
+/coverage/
+phpunit.xml
+phpcs.xml
+.phpcs-cache
+.php-cs-fixer.cache
+psalm.xml

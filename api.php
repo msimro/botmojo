@@ -53,14 +53,15 @@
  * - Error handling without information leakage
  * - Tool permission system for agent access control
  * 
- * @author AI Personal Assistant Development Team
- * @version 1.1
- * @since 2025-08-07
+ * @author BotMojo Development Team
+ * @version 2.0.0
+ * @since 2025-08-14
  * @license MIT
  * 
  * @see config.php Configuration constants and utility functions
- * @see agents/ Specialized AI agent implementations
- * @see tools/ Core tool and service classes
+ * @see src/Core/Orchestrator.php Main request orchestration logic
+ * @see src/Agents/ Specialized AI agent implementations
+ * @see src/Tools/ Core tool and service classes
  * @see index.php Frontend chat interface
  * @see dashboard.php Data visualization interface
  * 
@@ -78,39 +79,8 @@ ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 
-// Autoloading (will use Composer's autoloader when available)
-if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-} else {
-    // Manual autoloading as fallback
-    spl_autoload_register(function ($class) {
-        // Convert namespace to file path
-        $prefix = 'BotMojo\\';
-        $baseDir = __DIR__ . '/src/';
-        
-        // Check if the class uses the namespace prefix
-        $len = strlen($prefix);
-        if (strncmp($prefix, $class, $len) !== 0) {
-            return;
-        }
-        
-        // Get the relative class name
-        $relativeClass = substr($class, $len);
-        
-        // Convert namespace separator to directory separator
-        $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
-        
-        // Log the class loading attempt
-        error_log("Attempting to load class: {$class} from file: {$file}");
-        
-        // If the file exists, require it
-        if (file_exists($file)) {
-            require $file;
-        } else {
-            error_log("File not found: {$file}");
-        }
-    });
-}
+// Load Composer's autoloader
+require_once __DIR__ . '/vendor/autoload.php';
 
 /**
  * Load core configuration and initialize the application environment
@@ -276,7 +246,7 @@ try {
     
     $geminiTool = new GeminiTool(['api_key' => $_ENV['API_KEY'] ?? '']);
     
-    $historyTool = new HistoryTool(['db_tool' => $dbTool]);
+    $historyTool = new HistoryTool($dbTool);
     
     $promptBuilder = new PromptBuilder(['prompt_dir' => __DIR__ . '/prompts']);
     
@@ -342,33 +312,17 @@ try {
     // Return the response as JSON
     echo json_encode($response, JSON_PRETTY_PRINT);
     
-    // Create the complete prompt with user's current input
-    $fullPrompt = $triagePrompt . "\n\nUser Input: " . $userQuery;
+} catch (BotMojoException $e) {
+    // Handle BotMojo-specific exceptions
+    $errorResponse = [
+        'status' => 'error',
+        'message' => $e->getMessage(),
+        'code' => $e->getCode() ?: 400
+    ];
     
-    if ($isDebugMode) {
-        error_log("🎯 Sending triage request to Gemini AI (" . strlen($fullPrompt) . " chars)");
-    }
-    
-    // Execute AI analysis through Gemini API
-    $geminiResponse = callGeminiAPI($fullPrompt);
-    
-    // Validate that we received a valid response from Gemini
-    if (!$geminiResponse || !isset($geminiResponse['text'])) {
-        throw new Exception(
-            'Failed to get valid response from AI model. ' .
-            'Response: ' . json_encode($geminiResponse)
-        );
-    }
-    
-    if ($isDebugMode) {
-        error_log("🤖 Gemini AI response received (" . strlen($geminiResponse['text']) . " chars)");
-    }
-    if (!$geminiResponse || !isset($geminiResponse['text'])) {
-        throw new Exception('Failed to get response from AI model.');
-    }
-    
-    // Clean the response text to handle markdown code blocks
-    $responseText = trim($geminiResponse['text']);
+    header('Content-Type: application/json');
+    echo json_encode($errorResponse, JSON_PRETTY_PRINT);
+    exit;
     
     // Remove markdown code block markers if present
     if (strpos($responseText, '```json') !== false) {
