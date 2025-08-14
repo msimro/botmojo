@@ -47,6 +47,11 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 // Load configuration
 require_once __DIR__ . '/config.php';
 
+// Define DEBUG_MODE if not already defined
+if (!defined('DEBUG_MODE')) {
+    define('DEBUG_MODE', true); // Set to false in production
+}
+
 // Import core classes
 use BotMojo\Core\ServiceContainer;
 use BotMojo\Core\Orchestrator;
@@ -133,13 +138,51 @@ try {
     $dbPassword = $GLOBALS['config']['DB_PASSWORD'] ?? getenv('DB_PASSWORD') ?? '';
     $dbName = $GLOBALS['config']['DB_NAME'] ?? getenv('DB_NAME') ?? 'botmojo';
     
-    // Get Gemini API key from config or environment
-    $geminiApiKey = $GLOBALS['config']['GEMINI_API_KEY'] ?? getenv('GEMINI_API_KEY') ?? '';
+    // Get Gemini API key from all possible sources
+    $geminiApiKey = null;
+    $geminiModel = null;
+    
+    // Check defined constants first
+    if (defined('GEMINI_API_KEY')) {
+        $geminiApiKey = GEMINI_API_KEY;
+    }
+    // Check global config array
+    elseif (isset($GLOBALS['config']['GEMINI_API_KEY'])) {
+        $geminiApiKey = $GLOBALS['config']['GEMINI_API_KEY'];
+    }
+    // Check environment variables
+    elseif (getenv('GEMINI_API_KEY')) {
+        $geminiApiKey = getenv('GEMINI_API_KEY');
+    }
+    
+    // Get the model in the same way
+    if (defined('GEMINI_MODEL')) {
+        $geminiModel = GEMINI_MODEL;
+    }
+    elseif (isset($GLOBALS['config']['GEMINI_MODEL'])) {
+        $geminiModel = $GLOBALS['config']['GEMINI_MODEL'];
+    }
+    elseif (getenv('GEMINI_MODEL')) {
+        $geminiModel = getenv('GEMINI_MODEL');
+    }
     
     // Register tools
-    $container->set('tool.gemini', function() use ($geminiApiKey) {
+    $container->set('tool.gemini', function() use ($geminiApiKey, $geminiModel) {
         $tool = new GeminiTool();
-        $tool->initialize(['api_key' => $geminiApiKey]);
+        // Ensure we have a valid API key before initializing
+        if (!$geminiApiKey) {
+            // For development/testing, use a placeholder
+            error_log("⚠️ WARNING: No Gemini API key found. Using placeholder for development.");
+            $tool->initialize(['api_key' => 'placeholder-api-key-for-development']);
+        } else {
+            $config = ['api_key' => $geminiApiKey];
+            // Add model if available
+            if ($geminiModel) {
+                $config['model'] = $geminiModel;
+                error_log("🤖 Using Gemini model: {$geminiModel}");
+            }
+            $tool->initialize($config);
+        }
         return $tool;
     });
     

@@ -88,20 +88,114 @@ class Orchestrator
         // Get the Gemini tool for AI processing
         $geminiTool = $this->container->get('tool.gemini');
         
+        // Get prompt builder if available
+        $promptBuilder = null;
+        if ($this->container->has('tool.prompt_builder')) {
+            $promptBuilder = $this->container->get('tool.prompt_builder');
+        }
+        
         // Build the triage prompt
-        // In a more complete implementation, this would use PromptBuilder
-        $prompt = "Based on the query: '{$userQuery}', create a JSON plan..."; // Your full prompt
+        $prompt = '';
+        
+        // Use prompt builder if available
+        if ($promptBuilder) {
+            try {
+                $prompt = $promptBuilder->build('base/triage_agent_base.txt', [
+                    'agents' => 'components/agent_definitions.txt',
+                    'output_format' => 'formats/triage_json_output.txt'
+                ]);
+                
+                $prompt = $promptBuilder->replacePlaceholders($prompt, [
+                    'date' => date('Y-m-d'),
+                    'time' => date('H:i:s')
+                ]);
+                
+                $prompt .= "\n\nUser Input: " . $userQuery;
+                
+            } catch (Exception $e) {
+                // Fallback to basic prompt if prompt builder fails
+                error_log("⚠️ PromptBuilder failed: " . $e->getMessage() . ". Using fallback prompt.");
+                $prompt = $this->getFallbackPrompt($userQuery);
+            }
+        } else {
+            // Use fallback prompt if no prompt builder
+            $prompt = $this->getFallbackPrompt($userQuery);
+        }
         
         // Generate the plan
-        $planJson = $geminiTool->generateContent($prompt);
-        $plan = json_decode($planJson, true);
+        $responseText = $geminiTool->generateContent($prompt);
         
-        // Validate the plan
-        if (!$plan || !isset($plan['tasks'])) {
-            throw new Exception("Failed to generate a valid plan from AI triage.");
+        // Try to parse the response as JSON
+        $plan = json_decode($responseText, true);
+        
+        // Handle text responses that might not be proper JSON
+        if (!$plan || !is_array($plan)) {
+            // Try to extract JSON from text (in case AI wrapped it in explanatory text)
+            if (preg_match('/```(?:json)?(.*?)```/s', $responseText, $matches)) {
+                $jsonContent = trim($matches[1]);
+                $plan = json_decode($jsonContent, true);
+            }
+        }
+        
+        // Final validation of the plan
+        if (!$plan || !is_array($plan)) {
+            // Create a simple fallback plan
+            error_log("⚠️ Failed to parse plan from AI response. Creating fallback plan.");
+            error_log("AI Response: " . substr($responseText, 0, 500) . "...");
+            
+            $plan = [
+                'tasks' => [
+                    [
+                        'agent' => 'memory',
+                        'data' => [
+                            'operation' => 'retrieve',
+                            'search' => $userQuery
+                        ]
+                    ]
+                ],
+                'response' => "I processed your request: \"{$userQuery}\"",
+                'intent' => 'information_retrieval'
+            ];
+        }
+        
+        // Ensure plan has all required components
+        if (!isset($plan['tasks']) || !is_array($plan['tasks'])) {
+            $plan['tasks'] = [
+                [
+                    'agent' => 'memory',
+                    'data' => [
+                        'operation' => 'retrieve',
+                        'search' => $userQuery
+                    ]
+                ]
+            ];
+        }
+        
+        if (!isset($plan['response'])) {
+            $plan['response'] = "I processed your request: \"{$userQuery}\"";
         }
         
         return $plan;
+    }
+    
+    /**
+     * Get a fallback prompt for triage
+     *
+     * Simple prompt template for when the prompt builder isn't available.
+     *
+     * @param string $userQuery The user's query
+     *
+     * @return string The fallback prompt
+     */
+    private function getFallbackPrompt(string $userQuery): string
+    {
+        return "You are BotMojo, an AI personal assistant. " .
+               "Based on the query: '{$userQuery}', create a JSON plan that includes:\n" .
+               "1. An array of tasks for specialized agents (memory, planner, finance, health, etc.)\n" .
+               "2. A natural language response to the user\n" .
+               "3. The detected intent of the query\n\n" .
+               "Format your response as valid JSON with 'tasks', 'response', and 'intent' keys.\n" .
+               "Each task should have an 'agent' field and a 'data' object with operation details.";
     }
     
     /**
@@ -120,16 +214,43 @@ class Orchestrator
         
         foreach ($plan['tasks'] as $task) {
             $agentName = $task['agent'];
-            $agentKey = 'agent.' . strtolower($agentName);
             
-            // Check if the agent is registered
+            // Normalize agent name for service container key
+            // Convert MemoryAgent, memory_agent, or memory to agent.memory
+            $normalizedName = strtolower($agentName);
+            $normalizedName = preg_replace('/[^a-z0-9]/', '', $normalizedName);
+            $normalizedName = preg_replace('/agent$/', '', $normalizedName);
+            $agentKey = 'agent.' . $normalizedName;
+            
+            // Try to get the agent
             if (!$this->container->has($agentKey)) {
-                throw new Exception("Agent '{$agentName}' not registered.");
+                // If not found, try fallback to GeneralistAgent
+                error_log("⚠️ Agent '{$agentName}' not found. Using GeneralistAgent as fallback.");
+                
+                if ($this->container->has('agent.generalist')) {
+                    $agent = $this->container->get('agent.generalist');
+                } else {
+                    // If no GeneralistAgent, use MemoryAgent
+                    if ($this->container->has('agent.memory')) {
+                        $agent = $this->container->get('agent.memory');
+                    } else {
+                        throw new Exception("Agent '{$agentName}' not registered and no fallback agent available.");
+                    }
+                }
+            } else {
+                $agent = $this->container->get($agentKey);
             }
             
-            // Get the agent and process the task
-            $agent = $this->container->get($agentKey);
-            $results[$agentName] = $agent->process($task['data']);
+            // Process the task
+            try {
+                $results[$agentName] = $agent->process($task['data'] ?? []);
+            } catch (Exception $e) {
+                error_log("🔴 Error processing task for agent '{$agentName}': " . $e->getMessage());
+                $results[$agentName] = [
+                    'error' => $e->getMessage(),
+                    'status' => 'error'
+                ];
+            }
         }
         
         return $results;

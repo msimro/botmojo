@@ -30,7 +30,14 @@ class GeminiTool extends AbstractTool
      *
      * @var string
      */
-    private const API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+    private const API_ENDPOINT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
+    
+    /**
+     * Default model to use if none specified
+     * 
+     * @var string
+     */
+    private const DEFAULT_MODEL = 'gemini-pro';
     
     /**
      * Required configuration keys
@@ -51,6 +58,16 @@ class GeminiTool extends AbstractTool
     {
         foreach (self::REQUIRED_CONFIG as $key) {
             if (!isset($this->config[$key]) || empty($this->config[$key])) {
+                // Special handling for development environments
+                if (defined('DEBUG_MODE') && DEBUG_MODE && $key === 'api_key') {
+                    // In debug mode, we'll allow a placeholder for development
+                    if ($this->config[$key] === 'placeholder-api-key-for-development') {
+                        error_log("⚠️ Using placeholder Gemini API key. Content generation will be simulated.");
+                        // Continue with validation
+                        continue;
+                    }
+                }
+                
                 throw new BotMojoException(
                     "Missing required configuration: {$key}",
                     ['tool' => 'GeminiTool']
@@ -70,7 +87,20 @@ class GeminiTool extends AbstractTool
     public function generateContent(string $prompt): string
     {
         $apiKey = $this->getConfig('api_key');
-        $url = self::API_ENDPOINT . '?key=' . urlencode($apiKey);
+        $model = $this->getConfig('model', self::DEFAULT_MODEL);
+        
+        // Development fallback for testing without an API key
+        if ($apiKey === 'placeholder-api-key-for-development') {
+            return $this->generateDevelopmentResponse($prompt);
+        }
+        
+        // Build the complete API URL with the model
+        $url = self::API_ENDPOINT_BASE . $model . ':generateContent?key=' . urlencode($apiKey);
+        
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log("🔗 Gemini API URL (without key): " . self::API_ENDPOINT_BASE . $model . ':generateContent');
+            error_log("📝 Prompt length: " . strlen($prompt) . " characters");
+        }
         
         $payload = json_encode([
             'contents' => [
@@ -105,7 +135,7 @@ class GeminiTool extends AbstractTool
             if ($httpCode !== 200) {
                 throw new BotMojoException(
                     "Gemini API error: HTTP code {$httpCode}",
-                    ['response' => $response]
+                    ['response' => $response, 'url' => self::API_ENDPOINT_BASE . $model . ':generateContent']
                 );
             }
             
@@ -129,5 +159,37 @@ class GeminiTool extends AbstractTool
                 $e
             );
         }
+    }
+    
+    /**
+     * Generate a development response for testing without an API key
+     *
+     * @param string $prompt The user prompt
+     *
+     * @return string A simulated response
+     */
+    private function generateDevelopmentResponse(string $prompt): string
+    {
+        // For triage requests, return a simple JSON plan
+        if (strpos($prompt, 'create a JSON plan') !== false) {
+            return json_encode([
+                'tasks' => [
+                    [
+                        'agent' => 'MemoryAgent',
+                        'data' => [
+                            'operation' => 'retrieve',
+                            'entity_type' => 'generic',
+                            'search' => 'development mode'
+                        ]
+                    ]
+                ],
+                'response' => "I'm running in development mode without a Gemini API key. This is a simulated response to your query: \"" . substr($prompt, -100) . "\"",
+                'intent' => 'information_retrieval',
+                'timestamp' => time()
+            ], JSON_PRETTY_PRINT);
+        }
+        
+        // For other requests, return a simple text response
+        return "I'm running in development mode without a Gemini API key. This is a simulated response to your prompt: \"" . substr($prompt, 0, 100) . "...\"";
     }
 }

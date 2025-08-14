@@ -163,7 +163,22 @@
                 if (loadingMsg) loadingMsg.remove();
                 
                 // Display response
-                const botResponse = data.response || data.message || JSON.stringify(data);
+                let botResponse;
+                
+                if (data.response) {
+                    // Direct response from API
+                    botResponse = data.response;
+                } else if (data.plan && data.plan.response) {
+                    // Response from plan
+                    botResponse = data.plan.response;
+                } else if (data.message) {
+                    // Message (usually for errors)
+                    botResponse = data.message;
+                } else {
+                    // Fallback
+                    botResponse = "Received a response without a readable message.";
+                }
+                
                 addMessage(botResponse, 'bot');
                 
                 // Display full response for debugging
