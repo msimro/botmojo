@@ -13,10 +13,11 @@ declare(strict_types=1);
 
 namespace BotMojo\Agents;
 
-use BotMojo\Core\AbstractAgent;
+use BotMojo\Core\AgentInterface;
 use BotMojo\Exceptions\BotMojoException;
 use BotMojo\Tools\DatabaseTool;
 use BotMojo\Tools\GeminiTool;
+use BotMojo\Services\LoggerService;
 
 /**
  * Memory Agent
@@ -24,7 +25,7 @@ use BotMojo\Tools\GeminiTool;
  * Manages knowledge and memory for the BotMojo system.
  * Handles creating, retrieving, and updating memory entities.
  */
-class MemoryAgent extends AbstractAgent
+class MemoryAgent implements AgentInterface
 {
     /**
      * Database tool for data persistence
@@ -41,6 +42,13 @@ class MemoryAgent extends AbstractAgent
     private GeminiTool $geminiTool;
     
     /**
+     * Logger service
+     *
+     * @var LoggerService
+     */
+    private LoggerService $logger;
+    
+    /**
      * Constructor
      *
      * @param DatabaseTool $dbTool     The database tool
@@ -50,6 +58,7 @@ class MemoryAgent extends AbstractAgent
     {
         $this->dbTool = $dbTool;
         $this->geminiTool = $geminiTool;
+        $this->logger = new LoggerService('MemoryAgent');
     }
     
     /**

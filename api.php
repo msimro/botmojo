@@ -267,9 +267,94 @@ try {
         return $promptBuilder;
     });
     
+    // Register additional tools
+    $container->set('tool.weather', function() {
+        return new \BotMojo\Tools\WeatherTool(['api_key' => $_ENV['WEATHER_API_KEY'] ?? '']);
+    });
+    
+    $container->set('tool.calendar', function() {
+        return new \BotMojo\Tools\CalendarTool();
+    });
+    
+    $container->set('tool.contacts', function() {
+        return new \BotMojo\Tools\ContactsTool();
+    });
+    
+    $container->set('tool.search', function() {
+        return new \BotMojo\Tools\SearchTool();
+    });
+    
+    $container->set('tool.fitness', function() {
+        return new \BotMojo\Tools\FitnessTool();
+    });
+    
+    $container->set('tool.meditation', function() {
+        return new \BotMojo\Tools\MeditationTool();
+    });
+    
+    $container->set('tool.notes', function() {
+        return new \BotMojo\Tools\NotesTool();
+    });
+    
     // Register agents
     $container->set('agent.memory', function() use ($container) {
         return new \BotMojo\Agents\MemoryAgent(
+            $container->get('tool.database'),
+            $container->get('tool.gemini')
+        );
+    });
+    
+    $container->set('agent.finance', function() use ($container) {
+        return new \BotMojo\Agents\FinanceAgent(
+            $container->get('tool.database'),
+            $container->get('tool.gemini')
+        );
+    });
+    
+    $container->set('agent.health', function() use ($container) {
+        return new \BotMojo\Agents\HealthAgent(
+            $container->get('tool.database'),
+            $container->get('tool.gemini')
+        );
+    });
+    
+    $container->set('agent.learning', function() use ($container) {
+        return new \BotMojo\Agents\LearningAgent(
+            $container->get('tool.database'),
+            $container->get('tool.gemini')
+        );
+    });
+    
+    $container->set('agent.planner', function() use ($container) {
+        return new \BotMojo\Agents\PlannerAgent(
+            $container->get('tool.database'),
+            $container->get('tool.gemini')
+        );
+    });
+    
+    $container->set('agent.relationship', function() use ($container) {
+        return new \BotMojo\Agents\RelationshipAgent(
+            $container->get('tool.database'),
+            $container->get('tool.gemini')
+        );
+    });
+    
+    $container->set('agent.social', function() use ($container) {
+        return new \BotMojo\Agents\SocialAgent(
+            $container->get('tool.database'),
+            $container->get('tool.gemini')
+        );
+    });
+    
+    $container->set('agent.spiritual', function() use ($container) {
+        return new \BotMojo\Agents\SpiritualAgent(
+            $container->get('tool.database'),
+            $container->get('tool.gemini')
+        );
+    });
+    
+    $container->set('agent.generalist', function() use ($container) {
+        return new \BotMojo\Agents\GeneralistAgent(
             $container->get('tool.database'),
             $container->get('tool.gemini')
         );

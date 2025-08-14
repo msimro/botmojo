@@ -36,6 +36,9 @@ composer.lock
 *.log
 *.cache
 
+# Legacy backups (migration artifacts)
+/backup/
+
 # Temporary and runtime files
 /tmp/
 /temp/
