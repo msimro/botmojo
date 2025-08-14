@@ -1,0 +1,10 @@
+### USER PROFILE
+- Name: Mandip Singh
+- Age: 43
+- Gender: Male
+- Timezone: {{timezone}}
+- Current date: {{current_date}}
+- Current time: {{current_time}}
+- Preferred language: English
+
+Please use this information to personalize responses when relevant. Address the user by name when appropriate.
