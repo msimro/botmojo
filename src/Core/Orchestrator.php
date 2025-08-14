@@ -198,7 +198,12 @@ class Orchestrator
         }
         
         if (!isset($plan['response'])) {
-            $plan['response'] = "I processed your request: \"{$userQuery}\"";
+            // Use suggested_response from AI if available, otherwise fallback
+            if (isset($plan['suggested_response'])) {
+                $plan['response'] = $plan['suggested_response'];
+            } else {
+                $plan['response'] = "I processed your request: \"{$userQuery}\"";
+            }
         }
         
         if (!isset($plan['intent'])) {
@@ -287,7 +292,7 @@ class Orchestrator
             'status' => 'success',
             'plan' => $plan,
             'components' => $components,
-            'response' => $plan['response'] ?? 'I processed your request.',
+            'response' => $plan['response'] ?? 'I understand your request and have processed it.',
             'timestamp' => time()
         ];
     }
