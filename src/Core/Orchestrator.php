@@ -72,15 +72,10 @@ class Orchestrator
             $plan = $this->triageRequest($input);
             
             // Then execute the plan using appropriate agents
-            $components = $this->executeTaskPlan($plan, $input);
+            $components = $this->executeTaskPlan($plan);
             
             // Finally, assemble the response
-            $response = $this->assembleResponse($plan, $components);
-            
-            // Add suggested response if available
-            if (!empty($plan['suggested_response'])) {
-                $response['response'] = $plan['suggested_response'];
-            }
+            $response = $this->assembleResponse($components, $plan);
             
             // Add timestamp
             $response['timestamp'] = time();
@@ -99,7 +94,9 @@ class Orchestrator
                 $e
             );
         }
-    }    /**
+    }
+    
+    /**
      * Triage a user request using AI
      *
      * Use AI to analyze the request and generate an execution plan.
@@ -204,81 +201,72 @@ class Orchestrator
             $plan['response'] = "I processed your request: \"{$userQuery}\"";
         }
         
+        if (!isset($plan['intent'])) {
+            $plan['intent'] = 'general_request';
+        }
+        
         return $plan;
     }
     
     /**
      * Get a fallback prompt for triage
      *
-     * Simple prompt template for when the prompt builder isn't available.
+     * This is used when the prompt builder is not available.
      *
-     * @param string $userQuery The user's query
+     * @param string $userQuery The user query
      *
      * @return string The fallback prompt
      */
     private function getFallbackPrompt(string $userQuery): string
     {
-        return "You are BotMojo, an AI personal assistant. " .
-               "Based on the query: '{$userQuery}', create a JSON plan that includes:\n" .
-               "1. An array of tasks for specialized agents (memory, planner, finance, health, etc.)\n" .
-               "2. A natural language response to the user\n" .
-               "3. The detected intent of the query\n\n" .
-               "Format your response as valid JSON with 'tasks', 'response', and 'intent' keys.\n" .
-               "Each task should have an 'agent' field and a 'data' object with operation details.";
+        return "You are an AI assistant that analyzes user requests and creates execution plans. " .
+            "Create a JSON plan with 'tasks', 'response', and 'intent' fields for this query: " .
+            "\"{$userQuery}\". Tasks should include 'agent' and 'data' fields.";
     }
     
     /**
      * Execute the task plan with appropriate agents
      *
-     * Route each task to the appropriate agent and collect results.
-     *
      * @param array<string, mixed> $plan The execution plan
      *
-     * @throws Exception If an agent is not found
-     * @return array<string, mixed> Results from all agents
+     * @return array<string, mixed> The components created by agents
      */
     private function executeTaskPlan(array $plan): array
     {
         $results = [];
+        $tasks = $plan['tasks'] ?? [];
         
-        foreach ($plan['tasks'] as $task) {
-            $agentName = $task['agent'];
+        foreach ($tasks as $index => $task) {
+            $agentName = $task['agent'] ?? '';
+            $data = $task['data'] ?? [];
             
-            // Normalize agent name for service container key
-            // Convert MemoryAgent, memory_agent, or memory to agent.memory
-            $normalizedName = strtolower($agentName);
-            $normalizedName = preg_replace('/[^a-z0-9]/', '', $normalizedName);
-            $normalizedName = preg_replace('/agent$/', '', $normalizedName);
-            $agentKey = 'agent.' . $normalizedName;
-            
-            // Try to get the agent
-            if (!$this->container->has($agentKey)) {
-                // If not found, try fallback to GeneralistAgent
-                error_log("⚠️ Agent '{$agentName}' not found. Using GeneralistAgent as fallback.");
-                
-                if ($this->container->has('agent.generalist')) {
-                    $agent = $this->container->get('agent.generalist');
-                } else {
-                    // If no GeneralistAgent, use MemoryAgent
-                    if ($this->container->has('agent.memory')) {
-                        $agent = $this->container->get('agent.memory');
-                    } else {
-                        throw new Exception("Agent '{$agentName}' not registered and no fallback agent available.");
-                    }
-                }
-            } else {
-                $agent = $this->container->get($agentKey);
+            // Skip if agent name is missing
+            if (empty($agentName)) {
+                continue;
             }
             
-            // Process the task
+            // Build the full service name for the agent
+            $serviceName = "agent.{$agentName}";
+            
+            // Skip if agent is not registered
+            if (!$this->container->has($serviceName)) {
+                error_log("⚠️ Agent '{$agentName}' not found in container.");
+                continue;
+            }
+            
             try {
-                $results[$agentName] = $agent->process($task['data'] ?? []);
+                // Get the agent from the container
+                $agent = $this->container->get($serviceName);
+                
+                // Process the task with the agent
+                $taskResults = $agent->process($data);
+                
+                // Store the results
+                $results[$agentName] = $taskResults;
+                
             } catch (Exception $e) {
-                error_log("🔴 Error processing task for agent '{$agentName}': " . $e->getMessage());
-                $results[$agentName] = [
-                    'error' => $e->getMessage(),
-                    'status' => 'error'
-                ];
+                error_log("⚠️ Error executing task with agent '{$agentName}': " . $e->getMessage());
+                // Continue with other tasks
             }
         }
         
@@ -286,21 +274,19 @@ class Orchestrator
     }
     
     /**
-     * Assemble the final response from agent results
+     * Assemble the final response from components
      *
-     * Combine all agent outputs into a unified response structure.
-     *
-     * @param array<string, mixed> $results Agent processing results
-     * @param array<string, mixed> $plan    The execution plan
+     * @param array<string, mixed> $components The components created by agents
+     * @param array<string, mixed> $plan       The execution plan
      *
      * @return array<string, mixed> The assembled response
      */
-    private function assembleResponse(array $results, array $plan): array
+    private function assembleResponse(array $components, array $plan): array
     {
         return [
             'status' => 'success',
             'plan' => $plan,
-            'components' => $results,
+            'components' => $components,
             'response' => $plan['response'] ?? 'I processed your request.',
             'timestamp' => time()
         ];

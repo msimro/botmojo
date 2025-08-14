@@ -71,11 +71,61 @@
 // DEPENDENCY LOADING AND INITIALIZATION
 // =====================================================================
 
+declare(strict_types=1);
+
+// Enable error reporting for debugging
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+
+// Autoloading (will use Composer's autoloader when available)
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+} else {
+    // Manual autoloading as fallback
+    spl_autoload_register(function ($class) {
+        // Convert namespace to file path
+        $prefix = 'BotMojo\\';
+        $baseDir = __DIR__ . '/src/';
+        
+        // Check if the class uses the namespace prefix
+        $len = strlen($prefix);
+        if (strncmp($prefix, $class, $len) !== 0) {
+            return;
+        }
+        
+        // Get the relative class name
+        $relativeClass = substr($class, $len);
+        
+        // Convert namespace separator to directory separator
+        $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+        
+        // Log the class loading attempt
+        error_log("Attempting to load class: {$class} from file: {$file}");
+        
+        // If the file exists, require it
+        if (file_exists($file)) {
+            require $file;
+        } else {
+            error_log("File not found: {$file}");
+        }
+    });
+}
+
 /**
  * Load core configuration and initialize the application environment
  * This includes database constants, API keys, and utility functions
  */
 require_once 'config.php';
+
+// Import required classes
+use BotMojo\Core\ServiceContainer;
+use BotMojo\Core\Orchestrator;
+use BotMojo\Exceptions\BotMojoException;
+use BotMojo\Tools\DatabaseTool;
+use BotMojo\Tools\GeminiTool;
+use BotMojo\Tools\HistoryTool;
+use BotMojo\Tools\PromptBuilder;
 
 // =====================================================================
 // HTTP HEADERS AND CORS CONFIGURATION
@@ -115,7 +165,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  * graceful error handling and consistent response format.
  */
 try {
-    
     // =====================================================================
     // PHASE 1: INPUT VALIDATION AND PARAMETER EXTRACTION
     // =====================================================================
@@ -139,65 +188,61 @@ try {
     // Capture raw input stream for debugging and parsing
     $rawInput = file_get_contents('php://input');
     
-    // Log raw input in debug mode for troubleshooting
-    if (DEBUG_MODE) {
-        error_log("🔍 API Input Received: " . $rawInput);
-        error_log("🔍 Request Method: " . $_SERVER['REQUEST_METHOD']);
-        error_log("🔍 Content Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
-    }
+    // Always log input for debugging during this issue
+    error_log("🔍 API Input Received: " . $rawInput);
+    error_log("🔍 Request Method: " . $_SERVER['REQUEST_METHOD']);
+    error_log("🔍 Content Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
     
     // Parse JSON input with error checking
     $input = json_decode($rawInput, true);
     
-    // Validate JSON parsing was successful
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        throw new Exception(
-            'Invalid JSON input received. Error: ' . json_last_error_msg() . 
-            '. Raw input: ' . substr($rawInput, 0, 100) . '...'
+    // Validate input format
+    if (!is_array($input)) {
+        throw new BotMojoException(
+            "Invalid request format: JSON object expected", 
+            ['input' => $rawInput]
         );
     }
     
-    // Ensure input is an array/object and contains required fields
-    if (!$input || !is_array($input) || !isset($input['query'])) {
-        throw new Exception(
-            'Invalid request format. Expected JSON object with "query" field. ' .
-            'Received: ' . gettype($input) . 
-            (is_array($input) ? ' with keys: ' . implode(', ', array_keys($input)) : '')
+    // Extract and validate required parameters
+    if (!isset($input['query']) || empty(trim($input['query']))) {
+        throw new BotMojoException(
+            "Missing required parameter: query", 
+            ['input' => $input]
         );
     }
     
-    // Extract and validate core parameters
-    $userQuery = trim((string)$input['query']);
-    $conversationId = $input['conversation_id'] ?? 'default_conversation';
-    $userId = DEFAULT_USER_ID; // Single-user mode for now, multi-user ready
-    
-    // Debug mode can be overridden per request for testing
-    $debugModeOverride = isset($input['debug_mode']) ? (bool)$input['debug_mode'] : null;
-    $isDebugMode = ($debugModeOverride !== null) ? $debugModeOverride : DEBUG_MODE;
-    
-    // Validate query content
-    if (empty($userQuery)) {
-        throw new Exception('Query cannot be empty. Please provide a meaningful input.');
+    // Set default conversation ID if not provided
+    if (!isset($input['conversation_id']) || empty($input['conversation_id'])) {
+        $input['conversation_id'] = 'default_conversation';
     }
     
-    // Security: Prevent extremely long queries that might cause issues
-    if (strlen($userQuery) > 2000) {
-        throw new Exception('Query too long. Please limit input to 2000 characters.');
+    // Allow request-level debug mode override
+    $debugMode = defined('DEBUG_MODE') ? DEBUG_MODE : false;
+    if (isset($input['debug_mode']) && is_bool($input['debug_mode'])) {
+        $debugMode = $input['debug_mode'];
+    }
+    
+    // Validate query length for security
+    if (strlen($input['query']) > 2000) {
+        throw new BotMojoException(
+            'Query too long. Please limit input to 2000 characters.',
+            ['query_length' => strlen($input['query'])]
+        );
     }
     
     // Sanitize conversation ID to prevent path traversal attacks
-    $conversationId = preg_replace('/[^a-zA-Z0-9_-]/', '', $conversationId);
-    if (empty($conversationId)) {
-        $conversationId = 'default_conversation';
+    $input['conversation_id'] = preg_replace('/[^a-zA-Z0-9_-]/', '', $input['conversation_id']);
+    if (empty($input['conversation_id'])) {
+        $input['conversation_id'] = 'default_conversation';
     }
     
     // Log processed parameters in debug mode
-    if ($isDebugMode) {
+    if ($debugMode) {
         error_log("✅ Validated Parameters:");
-        error_log("   - User Query: " . substr($userQuery, 0, 100) . (strlen($userQuery) > 100 ? '...' : ''));
-        error_log("   - Conversation ID: " . $conversationId);
-        error_log("   - User ID: " . $userId);
-        error_log("   - Debug Mode: " . ($isDebugMode ? 'enabled' : 'disabled'));
+        error_log("   - User Query: " . substr($input['query'], 0, 100) . (strlen($input['query']) > 100 ? '...' : ''));
+        error_log("   - Conversation ID: " . $input['conversation_id']);
+        error_log("   - Debug Mode: " . ($debugMode ? 'enabled' : 'disabled'));
     }
     
     // =====================================================================
@@ -208,81 +253,94 @@ try {
      * Initialize core system components and tools
      * 
      * TOOL ARCHITECTURE:
-     * - PromptBuilder: Dynamic AI prompt assembly from templates
-     * - ConversationCache: File-based conversation history management
+     * - ServiceContainer: Dependency injection container
      * - DatabaseTool: Entity storage and retrieval operations
-     * - ToolManager: Centralized tool access and permission control
+     * - GeminiTool: Interface to Google Gemini AI API
+     * - HistoryTool: Conversation history management
+     * - PromptBuilder: Dynamic AI prompt assembly from templates
      * 
      * All tools are initialized once and reused throughout the request
      * lifecycle to optimize performance and maintain consistency.
      */
     
-    // Initialize prompt management system for dynamic AI prompt generation
-    $promptBuilder = new PromptBuilder(PROMPTS_DIR);
-    if ($isDebugMode) {
-        error_log("🔧 PromptBuilder initialized with directory: " . PROMPTS_DIR);
-    }
+    // Initialize the service container
+    $container = new ServiceContainer();
     
-    // Initialize conversation context management
-    $conversationCache = new ConversationCache(CACHE_DIR);
-    if ($isDebugMode) {
-        error_log("💬 ConversationCache initialized with directory: " . CACHE_DIR);
-    }
+    // Create tool instances
+    $dbTool = new DatabaseTool([
+        'host' => $_ENV['DB_HOST'] ?? 'db', 
+        'database' => $_ENV['DB_NAME'] ?? 'db', 
+        'user' => $_ENV['DB_USER'] ?? 'db', 
+        'password' => $_ENV['DB_PASS'] ?? 'db'
+    ]);
     
-    // Initialize database operations handler
-    $databaseTool = new DatabaseTool();
-    if ($isDebugMode) {
-        error_log("🗄️ DatabaseTool initialized with connection to: " . DB_NAME);
-    }
+    $geminiTool = new GeminiTool(['api_key' => $_ENV['API_KEY'] ?? '']);
     
-    // Initialize centralized tool management system
-    $toolManager = new ToolManager();
-    if ($isDebugMode) {
-        error_log("🛠️ ToolManager initialized with agent permission system");
+    $historyTool = new HistoryTool(['db_tool' => $dbTool]);
+    
+    $promptBuilder = new PromptBuilder(['prompt_dir' => __DIR__ . '/prompts']);
+    
+    // Register tools in the service container
+    $container->set('tool.database', function() use ($dbTool) {
+        return $dbTool;
+    });
+    
+    $container->set('tool.gemini', function() use ($geminiTool) {
+        return $geminiTool;
+    });
+    
+    $container->set('tool.history', function() use ($historyTool) {
+        return $historyTool;
+    });
+    
+    $container->set('tool.prompt_builder', function() use ($promptBuilder) {
+        return $promptBuilder;
+    });
+    
+    // Register agents
+    $container->set('agent.memory', function() use ($container) {
+        return new \BotMojo\Agents\MemoryAgent(
+            $container->get('tool.database'),
+            $container->get('tool.gemini')
+        );
+    });
+    
+    if ($debugMode) {
+        error_log("� Service container initialized with core tools and agents");
     }
     
     // =====================================================================
-    // PHASE 3: AI-POWERED TRIAGE AND INTENT ANALYSIS
+    // PHASE 3: REQUEST PROCESSING THROUGH ORCHESTRATOR
     // =====================================================================
     
     /**
-     * Execute the triage-first analysis using Google Gemini AI
+     * Use the Orchestrator to process the request
      * 
-     * TRIAGE PROCESS:
-     * 1. Retrieve conversation history for context
-     * 2. Build dynamic prompt with agent definitions and output format
-     * 3. Include user profile and conversation context
-     * 4. Send to Gemini AI for intelligent analysis
-     * 5. Parse structured JSON response with execution plan
-     * 6. Validate and prepare for agent routing
-     * 
-     * The triage system is the core innovation that enables intelligent
-     * request routing without hardcoded rules or complex routing logic.
+     * The Orchestrator handles:
+     * 1. Triaging the request with AI
+     * 2. Routing tasks to appropriate agents
+     * 3. Assembling results into a unified response
+     * 4. Updating conversation history
      */
     
-    // Retrieve conversation history to provide context for better understanding
-    $conversationHistory = $conversationCache->getHistory($conversationId);
-    $historyLength = is_array($conversationHistory) ? count($conversationHistory) : 0;
+    // Initialize the orchestrator
+    $orchestrator = new Orchestrator($container);
     
-    if ($isDebugMode) {
-        error_log("📚 Retrieved conversation history: {$historyLength} messages");
+    // Process the request
+    $response = $orchestrator->handleRequest($input);
+    
+    // Add debug information if in debug mode
+    if ($debugMode) {
+        $response['debug'] = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'input' => $input,
+            'php_version' => PHP_VERSION,
+            'memory_usage' => memory_get_usage(true) / 1024 / 1024 . ' MB'
+        ];
     }
     
-    // Build the comprehensive triage prompt using template system
-    $triagePrompt = $promptBuilder->build('base/triage_agent_base.txt', [
-        'agent_definitions' => 'components/agent_definitions.txt',
-        'output_format' => 'formats/triage_json_output.txt', 
-        'user_profile' => 'components/user_profile.txt'
-    ]);
-    
-    if ($isDebugMode) {
-        error_log("📝 Triage prompt built with " . strlen($triagePrompt) . " characters");
-    }
-    
-    // Inject conversation history into the prompt template
-    $triagePrompt = $promptBuilder->replacePlaceholders($triagePrompt, [
-        'conversation_history' => $conversationHistory
-    ]);
+    // Return the response as JSON
+    echo json_encode($response, JSON_PRETTY_PRINT);
     
     // Create the complete prompt with user's current input
     $fullPrompt = $triagePrompt . "\n\nUser Input: " . $userQuery;
@@ -435,60 +493,70 @@ try {
         }
     }
     
-    // =============================================================================
-    // CONVERSATION HISTORY - CACHE UPDATE
-    // =============================================================================
+    // =====================================================================
+    // PHASE 3: REQUEST PROCESSING THROUGH ORCHESTRATOR
+    // =====================================================================
     
-    // Save this conversation turn to history cache
-    $conversationCache->appendToHistory($conversationId, $userQuery, $suggestedResponse);
+    /**
+     * Use the Orchestrator to process the request
+     * 
+     * The Orchestrator handles:
+     * 1. Triaging the request with AI
+     * 2. Routing tasks to appropriate agents
+     * 3. Assembling results into a unified response
+     * 4. Updating conversation history
+     */
     
-    // =============================================================================
-    // RESPONSE GENERATION - SUCCESS OUTPUT
-    // =============================================================================
+    // Initialize the orchestrator
+    $orchestrator = new Orchestrator($container);
     
-    // Include tool response handler
-    require_once 'tools/ToolResponseHandler.php';
+    // Process the request
+    $response = $orchestrator->handleRequest($input);
     
-    // Enhance the response with all tool data from all components
-    $enhancedResponse = enhanceResponseWithToolData($suggestedResponse, $assembledComponents, $userQuery);
-    
-    // Return successful response with enhanced message
-    $responseData = [
-        'success' => true,
-        'response' => $enhancedResponse,
-        'timestamp' => date('Y-m-d H:i:s')
-    ];
-    
-    // Include debug data if in development mode or explicitly requested
-    if ($isDebugMode) {
-        $responseData['triage_data'] = $triageResponse;
-        $responseData['debug'] = [
-            'original_response' => $suggestedResponse,
-            'enhanced_response' => $enhancedResponse,
-            'has_weather_component' => !empty($assembledComponents['general_component']['tool_insights']['weather']),
-            'components' => array_keys($assembledComponents),
-            'execution_results' => $executionResults ?? [],
-            'component_data' => $assembledComponents
+    // Add debug information if in debug mode
+    if ($debugMode) {
+        $response['debug'] = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'input' => $input,
+            'php_version' => PHP_VERSION,
+            'memory_usage' => memory_get_usage(true) / 1024 / 1024 . ' MB'
         ];
     }
     
-    echo json_encode($responseData);
+    // Return the response as JSON
+    echo json_encode($response, JSON_PRETTY_PRINT);
+    
+} catch (BotMojoException $e) {
+    // Handle BotMojo-specific exceptions
+    $errorResponse = [
+        'status' => 'error',
+        'message' => $e->getMessage(),
+        'code' => $e->getCode() ?: 400
+    ];
+    
+    // Add context data in debug mode
+    if ($debugMode) {
+        $errorResponse['context'] = $e->getContext();
+        $errorResponse['trace'] = $e->getTraceAsString();
+    }
+    
+    http_response_code(400);
+    echo json_encode($errorResponse, JSON_PRETTY_PRINT);
     
 } catch (Exception $e) {
-    // =============================================================================
-    // ERROR HANDLING - FAILURE RESPONSE
-    // =============================================================================
+    // Handle general exceptions
+    $errorResponse = [
+        'status' => 'error',
+        'message' => 'Internal server error: ' . $e->getMessage(),
+        'code' => 500
+    ];
     
-    // Set HTTP error status code
+    // Add detailed error info in debug mode
+    if (defined('DEBUG_MODE') && DEBUG_MODE) {
+        $errorResponse['detail'] = $e->getMessage();
+        $errorResponse['trace'] = $e->getTraceAsString();
+    }
+    
     http_response_code(500);
-    
-    // Return structured error response
-    echo json_encode([
-        'success' => false,
-        'error' => $e->getMessage(),
-        'timestamp' => date('Y-m-d H:i:s')
-    ]);
-    
-    // Log the error for debugging and monitoring
-    error_log("API Error: " . $e->getMessage());
+    echo json_encode($errorResponse, JSON_PRETTY_PRINT);
 }

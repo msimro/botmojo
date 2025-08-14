@@ -112,13 +112,15 @@ class GeminiTool extends AbstractTool
         try {
             return $this->callGeminiAPI($prompt, $apiKey, $model);
         } catch (BotMojoException $e) {
-            // Check if it's a server error (like 503)
-            if (strpos($e->getMessage(), 'HTTP code 5') !== false) {
+            // Check if it's a server error (like 503) or model not found error (404)
+            if (strpos($e->getMessage(), 'HTTP code 5') !== false || 
+                strpos($e->getMessage(), 'HTTP code 404') !== false) {
+                
                 if (defined('DEBUG_MODE') && DEBUG_MODE) {
-                    error_log("⚠️ Primary model {$model} failed with server error. Trying fallback models...");
+                    error_log("⚠️ Primary model {$model} failed. Trying fallback models...");
                 }
                 
-                // Try fallback models if the primary model is overloaded
+                // Try fallback models if the primary model failed
                 foreach (self::FALLBACK_MODELS as $fallbackModel) {
                     // Skip if it's the same as the one we just tried
                     if ($fallbackModel === $model) {
@@ -162,15 +164,16 @@ class GeminiTool extends AbstractTool
         }
         
         // Build the complete API URL with the model
-        $apiUrl = self::API_ENDPOINT_BASE . ltrim($model, 'models/') . ':generateContent';
+        $modelName = ltrim($model, 'models/');
+        $apiUrl = self::API_ENDPOINT_BASE . $modelName . ':generateContent';
         $url = $apiUrl . '?key=' . urlencode($apiKey);
         
         if (defined('DEBUG_MODE') && DEBUG_MODE) {
-            error_log("🔗 Gemini API URL: " . $apiUrl);
-            error_log("🤖 Using model: " . $model);
+            error_log("🔗 Using Gemini model: " . $modelName);
             error_log("📝 Prompt length: " . strlen($prompt) . " characters");
         }
         
+        // Build standard payload with safety settings
         $payload = json_encode([
             'contents' => [
                 [
@@ -183,11 +186,12 @@ class GeminiTool extends AbstractTool
                 'temperature' => 0.4,
                 'topP' => 0.8,
                 'topK' => 40,
-                'maxOutputTokens' => 2048,
+                'maxOutputTokens' => 1024,
             ]
         ]);
         
         try {
+            // Initialize cURL session
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
@@ -196,11 +200,13 @@ class GeminiTool extends AbstractTool
                 'Content-Type: application/json'
             ]);
             
+            // Execute the request
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $curlError = curl_error($ch);
             curl_close($ch);
             
+            // Handle connection errors
             if ($curlError) {
                 throw new BotMojoException(
                     "CURL error: " . $curlError,
@@ -208,42 +214,43 @@ class GeminiTool extends AbstractTool
                 );
             }
             
+            // Handle HTTP errors
             if ($httpCode !== 200) {
-                // Log the full response for debugging
                 if (defined('DEBUG_MODE') && DEBUG_MODE) {
                     error_log("❌ Gemini API error. Response: " . $response);
                 }
                 
                 throw new BotMojoException(
                     "Gemini API error: HTTP code {$httpCode}",
-                    ['response' => $response, 'url' => $apiUrl, 'model' => $model]
+                    ['response' => $response, 'model' => $modelName]
                 );
             }
             
+            // Parse and extract response
             $data = json_decode($response, true);
             
-            // Extract text from the response
             if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
                 $text = $data['candidates'][0]['content']['parts'][0]['text'];
                 
                 if (defined('DEBUG_MODE') && DEBUG_MODE) {
-                    error_log("✅ Gemini API response received (" . strlen($text) . " characters)");
+                    error_log("✅ Gemini response received (" . strlen($text) . " characters)");
                 }
                 
                 return $text;
             }
             
-            // Log the full response for debugging
+            // Handle unexpected response format
             if (defined('DEBUG_MODE') && DEBUG_MODE) {
                 error_log("❓ Unexpected Gemini API response format: " . $response);
             }
             
             throw new BotMojoException(
                 "Unexpected Gemini API response format",
-                ['response' => $response, 'model' => $model]
+                ['response' => $response, 'model' => $modelName]
             );
             
         } catch (Exception $e) {
+            // Pass through BotMojoExceptions
             if ($e instanceof BotMojoException) {
                 throw $e;
             }
@@ -254,7 +261,7 @@ class GeminiTool extends AbstractTool
             
             throw new BotMojoException(
                 "Failed to generate content: " . $e->getMessage(),
-                ['prompt' => $prompt, 'model' => $model],
+                ['model' => $modelName],
                 0,
                 $e
             );
@@ -271,25 +278,24 @@ class GeminiTool extends AbstractTool
     private function generateDevelopmentResponse(string $prompt): string
     {
         // For triage requests, return a simple JSON plan
-        if (strpos($prompt, 'create a JSON plan') !== false) {
+        if (strpos($prompt, 'triage') !== false) {
             return json_encode([
+                'triage_summary' => 'Development mode - simulated triage',
+                'suggested_response' => 'I\'m running in development mode without a Gemini API key. This is a simulated response.',
                 'tasks' => [
                     [
-                        'agent' => 'MemoryAgent',
+                        'agent' => 'memory',
                         'data' => [
                             'operation' => 'retrieve',
-                            'entity_type' => 'generic',
-                            'search' => 'development mode'
+                            'search' => substr($prompt, -100)
                         ]
                     ]
-                ],
-                'response' => "I'm running in development mode without a Gemini API key. This is a simulated response to your query: \"" . substr($prompt, -100) . "\"",
-                'intent' => 'information_retrieval',
-                'timestamp' => time()
+                ]
             ], JSON_PRETTY_PRINT);
         }
         
         // For other requests, return a simple text response
-        return "I'm running in development mode without a Gemini API key. This is a simulated response to your prompt: \"" . substr($prompt, 0, 100) . "...\"";
+        return "I'm running in development mode without a valid Gemini API key. " .
+               "To use BotMojo fully, please set up a valid API key in config.php or as an environment variable.";
     }
 }

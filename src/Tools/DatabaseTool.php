@@ -77,6 +77,10 @@ class DatabaseTool extends AbstractTool
                     $this->config['database']
                 );
                 
+                if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                    error_log("🔌 Connecting to database with DSN: {$dsn}");
+                }
+                
                 $this->connection = new PDO(
                     $dsn,
                     $this->config['user'],
@@ -87,10 +91,22 @@ class DatabaseTool extends AbstractTool
                         PDO::ATTR_EMULATE_PREPARES => false,
                     ]
                 );
+                
+                if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                    error_log("✅ Database connection established successfully");
+                }
             } catch (PDOException $e) {
+                if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                    error_log("❌ Database connection failed: " . $e->getMessage());
+                    error_log("📋 Connection parameters: host={$this->config['host']}, database={$this->config['database']}, user={$this->config['user']}");
+                }
+                
                 throw new BotMojoException(
                     "Database connection failed: " . $e->getMessage(),
-                    [],
+                    [
+                        'host' => $this->config['host'],
+                        'database' => $this->config['database']
+                    ],
                     0,
                     $e
                 );

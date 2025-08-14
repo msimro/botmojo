@@ -1,6 +1,6 @@
-# BotMojo - AI Personal Assistant ✅ Phase 1 Complete
+# BotMojo - AI Personal Assistant ✅ Phase 2 Complete
 
-**Intelligent, modular, multi-agent personal assistant with enhanced AI capabilities**
+**Intelligent, modular, multi-agent personal assistant with enhanced AI capabilities and proper OOP architecture**
 
 > 💡 **For Developers**: Check out [.github/copilot-instructions.md](.github/copilot-instructions.md) for project architecture and development guidelines.
 
@@ -13,14 +13,14 @@ ddev import-db --src=database.sql
 ```
 
 ### 2. Configuration
-1. Edit `config.php` and update:
-   - Google Gemini API key (GEMINI_API_KEY)
+1. Copy `.env.example` to `.env` and add:
+   - Google Gemini API key (API_KEY)
    - Database is auto-configured via DDEV
 
 ### 3. Getting Your Gemini API Key
 1. Visit [Google AI Studio](https://aistudio.google.com/)
 2. Create a new API key
-3. Copy the key and paste it in `config.php`
+3. Copy the key and paste it in `.env`
 
 ### 4. Testing
 1. Open `index.php` in your web browser
@@ -29,33 +29,43 @@ ddev import-db --src=database.sql
    - "Schedule a meeting with John tomorrow at 3 PM"
    - "Remember that Sarah likes coffee"
 
-## ✨ What's New in Phase 1
+## ✨ What's New in Phase 2
 
-### 🤖 Enhanced Agents (All v1.1)
+### 🏗️ Architecture Improvements
+- **Modern OOP Structure**: Fully refactored with namespaces and PSR standards
+- **Dependency Injection**: ServiceContainer for managing component dependencies
+- **Interface-Based Design**: Clear contracts for Agents and Tools
+- **Strict Typing**: Type safety with PHP 8 strict typing enforcement
+- **Environment Variables**: Configuration via .env file for improved security
+
+### 🤖 Enhanced Agents
 - **MemoryAgent**: Intelligent knowledge graph with rich relationship parsing
 - **PlannerAgent**: Advanced date/time parsing and smart scheduling
 - **FinanceAgent**: Multi-currency support with intelligent categorization
 - **GeneralistAgent**: Advanced content analysis with sentiment detection
 
-### 🏗️ Architecture Highlights
-- **Triage-First**: AI-driven intent analysis and execution planning
-- **Agent-Based**: Specialized processing with modular design
-- **Unified Database**: Flexible entities/relationships schema
-- **File-Based Cache**: Conversation history preservation
-
 ## 📁 Project Structure
 
 ```
 /botmojo/
-├── agents/                    # Enhanced AI agents (v1.1)
-│   ├── MemoryAgent.php       # Smart knowledge graph with relationships
-│   ├── PlannerAgent.php      # Advanced scheduling and task management
-│   ├── FinanceAgent.php      # Multi-currency financial analytics
-│   └── GeneralistAgent.php  # Intelligent content analysis
-├── tools/                    # Core utility classes
-│   ├── DatabaseTool.php      # Database operations and entity management
-│   ├── PromptBuilder.php     # Dynamic AI prompt assembly
-│   └── ConversationCache.php # File-based conversation history
+├── src/                      # Main source code with namespaces
+│   ├── Core/                 # Core system components
+│   │   ├── AbstractAgent.php # Base agent functionality
+│   │   ├── AbstractTool.php  # Base tool functionality
+│   │   ├── AgentInterface.php # Agent contract
+│   │   ├── ToolInterface.php # Tool contract
+│   │   ├── Orchestrator.php  # Main request coordinator
+│   │   └── ServiceContainer.php # Dependency injection container
+│   ├── Agents/               # Enhanced AI agents
+│   │   ├── MemoryAgent.php   # Smart knowledge graph with relationships
+│   │   └── [Other agents]    # Additional specialized agents
+│   ├── Tools/                # Utility tools
+│   │   ├── DatabaseTool.php  # Database operations and entity management
+│   │   ├── GeminiTool.php    # Google Gemini AI API integration
+│   │   ├── HistoryTool.php   # Conversation history management
+│   │   └── PromptBuilder.php # Dynamic AI prompt assembly
+│   └── Exceptions/           # Custom exception handling
+│       └── BotMojoException.php # Domain-specific exceptions
 ├── prompts/                  # AI prompt templates
 │   ├── base/
 │   │   └── triage_agent_base.txt      # Main triage prompt template
@@ -64,13 +74,13 @@ ddev import-db --src=database.sql
 │   └── formats/
 │       └── triage_json_output.txt     # JSON response format spec
 ├── cache/                    # Conversation cache files
+├── .env.example             # Environment variable template
+├── .env                     # Active environment configuration (ignored by git)
 ├── config.php               # Configuration and utilities
 ├── database.sql             # Database schema
 ├── api.php                  # Main API orchestrator
-├── index.php               # Chat interface
-├── dashboard.php           # Data visualization dashboard
-├── completed.md            # Phase 1 completion summary
-└── upnext.md              # Phase 2 roadmap
+├── index.php                # Chat interface
+└── dashboard.php            # Data visualization dashboard
 ```
 
 ## 🎯 System Capabilities
@@ -98,6 +108,38 @@ ddev import-db --src=database.sql
 - Intelligent priority assessment
 - Context-aware scheduling
 - Task and goal management
+
+## 🧠 Technical Implementation
+
+### Dependency Injection
+- `ServiceContainer` manages all component dependencies
+- Lazy-loading of services for improved performance
+- Clean separation of concerns with interface-based design
+
+### OOP Architecture
+- `AbstractAgent` provides shared functionality for all agents
+- `AbstractTool` provides common functionality for all tools
+- Interfaces define clear contracts for components
+- PSR-compliant namespacing structure
+
+### API Integration
+- Google Gemini AI with model fallback strategy
+- Structured error handling with context preservation
+- JSON-based communication with clear data structures
+
+### Configuration Management
+- Environment-based configuration with .env file
+- Separation of settings from codebase
+- Secure credential handling
+
+## 📊 Future Development
+
+### Phase 3 Goals
+- Implement additional specialized agents
+- Add comprehensive unit and integration testing
+- Enhance web interface with modern framework
+- Implement caching and performance optimizations
+- Add OAuth-based authentication and multi-user support
 
 ## How It Works
 │   ├── base/

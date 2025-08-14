@@ -29,6 +29,16 @@ abstract class AbstractTool implements ToolInterface
     protected array $config = [];
     
     /**
+     * Constructor
+     *
+     * @param array<string, mixed> $config Configuration parameters for the tool
+     */
+    public function __construct(array $config = [])
+    {
+        $this->initialize($config);
+    }
+    
+    /**
      * Initialize the tool with configuration
      *
      * Set up the tool with any required configuration parameters.

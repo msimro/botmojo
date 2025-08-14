@@ -1,53 +1,61 @@
 <?php
 /**
- * Configuration File for AI Personal Assistant - Core v1
+ * Configuration File for BotMojo - Personal AI Assistant
  * 
  * This file contains all configuration constants, database settings,
  * API configurations, and utility functions used throughout the application.
  * 
- * @author AI Personal Assistant Team
- * @version 1.0
- * @since 2025-08-07
+ * @author BotMojo Team
+ * @version 2.0
+ * @since 2025-08-10
  */
+
+// =============================================================================
+// ENVIRONMENT VARIABLE LOADING
+// =============================================================================
+
+// Load environment variables from .env file if present
+if (file_exists(__DIR__ . '/.env')) {
+    $env = parse_ini_file(__DIR__ . '/.env');
+    if ($env) {
+        foreach ($env as $key => $value) {
+            $_ENV[$key] = $value;
+            putenv("$key=$value");
+        }
+    }
+}
 
 // =============================================================================
 // DATABASE CONFIGURATION
 // =============================================================================
 // MySQL database connection settings for DDEV local environment
-define('DB_HOST', 'db');                         // Database host (db for DDEV)
-define('DB_USER', 'db');                         // Database username (db for DDEV)
-define('DB_PASS', 'db');                         // Database password (db for DDEV)
-define('DB_NAME', 'assistant_core_v1');          // Database name
+define('DB_HOST', $_ENV['DB_HOST'] ?? 'db');     // Database host (db for DDEV)
+define('DB_USER', $_ENV['DB_USER'] ?? 'db');     // Database username (db for DDEV)
+define('DB_PASS', $_ENV['DB_PASS'] ?? 'db');     // Database password (db for DDEV)
+define('DB_NAME', $_ENV['DB_NAME'] ?? 'db');     // Database name
 
 // =============================================================================
 // GOOGLE GEMINI API CONFIGURATION
 // =============================================================================
 // API settings for Google's Gemini AI model integration
-define('GEMINI_API_KEY', 'AIzaSyCQA9i6FdiGTvpw7EWVsp3vYJF-agcTp10');  // Replace with your actual API key
-define('GEMINI_MODEL', 'gemini-2.5-flash-lite');  // Latest available flash-lite model
+define('GEMINI_API_KEY', $_ENV['API_KEY'] ?? ''); // API key from .env file
+define('GEMINI_MODEL', $_ENV['DEFAULT_MODEL'] ?? 'gemini-2.5-flash-lite'); // Model from .env file
 define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/' . GEMINI_MODEL . ':generateContent');
 
 // =============================================================================
 // EXTERNAL API CONFIGURATIONS
 // =============================================================================
 // OpenWeatherMap API for weather information
-// Get your free API key at: https://openweathermap.org/api
-define('OPENWEATHER_API_KEY', 'f526963b95687d981c884d6788c4a20a');  // Updated API key for testing
-
-// Google Custom Search API for web search capabilities
-// Get your API key from Google Cloud Console: https://console.cloud.google.com/
-// Create a Programmable Search Engine: https://programmablesearchengine.google.com/
-define('GOOGLE_SEARCH_API_KEY', 'AIzaSyBOhXuuQHXKReMfwNCzK0Vo8EojYY10GgQ'); // API key provided for testing
-define('GOOGLE_SEARCH_CX', '667d50a04bb4c49e3');      // Programmable Search Engine ID
+define('OPENWEATHER_API_KEY', $_ENV['OPENWEATHER_API_KEY'] ?? '');  // Weather API key
 
 // Default timezone for calendar and date operations
-define('DEFAULT_TIMEZONE', 'America/New_York');  // Change to your preferred timezone
+define('DEFAULT_TIMEZONE', $_ENV['TIMEZONE'] ?? 'America/New_York');  // Default timezone
 
 // =============================================================================
 // APPLICATION CONFIGURATION
 // =============================================================================
 // Core application settings and directory paths
-define('DEFAULT_USER_ID', 'default_user_001');  // Default user identifier for single-user setup
+define('DEFAULT_USER_ID', $_ENV['DEFAULT_USER_ID'] ?? 'default_user');  // Default user identifier
 define('CACHE_DIR', __DIR__ . '/cache');         // Conversation cache storage directory
 define('PROMPTS_DIR', __DIR__ . '/prompts');     // AI prompt templates directory
 
@@ -55,12 +63,15 @@ define('PROMPTS_DIR', __DIR__ . '/prompts');     // AI prompt templates director
 // DEVELOPMENT & DEBUGGING SETTINGS
 // =============================================================================
 // Error reporting configuration (set to false in production)
-define('DEBUG_MODE', true);  // Enable detailed error reporting and debug output for debugging
+define('DEBUG_MODE', isset($_ENV['DEBUG_MODE']) ? filter_var($_ENV['DEBUG_MODE'], FILTER_VALIDATE_BOOLEAN) : false);
 
 // Configure PHP error reporting based on debug mode
 if (DEBUG_MODE) {
     error_reporting(E_ALL);           // Report all PHP errors
     ini_set('display_errors', 1);     // Display errors in browser
+} else {
+    error_reporting(E_ERROR | E_PARSE); // Only report critical errors in production
+    ini_set('display_errors', 0);     // Don't display errors in browser
 }
 
 // =============================================================================

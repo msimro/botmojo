@@ -1,7 +1,0 @@
-#!/bin/bash
-
-# BotMojo Launch Script
-# This script starts the BotMojo personal assistant
-
-echo "🤖 Starting BotMojo Personal Assistant..."
-php launch.php

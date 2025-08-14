@@ -1,0 +1,14 @@
+{
+    "name": "botmojo/botmojo",
+    "description": "BotMojo AI Personal Assistant",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "BotMojo\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.0"
+    }
+}
