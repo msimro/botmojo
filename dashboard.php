@@ -5,16 +5,30 @@
  * This page provides a visual interface to view and manage stored entities,
  * including financial data, memories, planning items, and general interactions.
  * 
- * @author AI Personal Assistant Team
- * @version 1.0
- * @since 2025-08-07
+ * @author BotMojo Development Team
+ * @version 2.0.0
+ * @since 2025-08-14
+ * @license MIT
  */
 
+// Load Composer autoloader first
+require_once __DIR__ . '/vendor/autoload.php';
+
+// Then load configuration
 require_once 'config.php';
 
-// Initialize database tool
-$databaseTool = new DatabaseTool();
-$userId = DEFAULT_USER_ID;
+// Import required classes
+use BotMojo\Tools\DatabaseTool;
+
+// Initialize database tool with proper configuration
+$databaseTool = new DatabaseTool([
+    'host' => $_ENV['DB_HOST'] ?? 'db',
+    'database' => $_ENV['DB_NAME'] ?? 'db', 
+    'user' => $_ENV['DB_USER'] ?? 'db',
+    'password' => $_ENV['DB_PASS'] ?? 'db'
+]);
+
+$userId = $_ENV['DEFAULT_USER_ID'] ?? 'default_user';
 
 // Get counts for each entity type
 $entityTypes = ['person', 'event', 'task', 'financial', 'general', 'interaction'];
@@ -22,24 +36,22 @@ $entityCounts = [];
 $recentEntities = [];
 
 foreach ($entityTypes as $type) {
-    $entities = $databaseTool->findEntitiesByType($userId, $type);
+    // Use raw SQL query to get entities by type
+    $entities = $databaseTool->query(
+        "SELECT * FROM entities WHERE user_id = ? AND type = ? ORDER BY created_at DESC",
+        [$userId, $type]
+    );
     $entityCounts[$type] = count($entities);
     
     // Get the 3 most recent entities of this type
-    $recentEntities[$type] = array_slice($entities, -3);
+    $recentEntities[$type] = array_slice($entities, 0, 3);
 }
 
 // Get all entities for the timeline
-$db = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-if ($db->connect_error) {
-    die("Connection failed: " . $db->connect_error);
-}
-
-$allEntitiesQuery = "SELECT * FROM entities WHERE user_id = ? ORDER BY created_at DESC LIMIT 20";
-$stmt = $db->prepare($allEntitiesQuery);
-$stmt->bind_param("s", $userId);
-$stmt->execute();
-$timelineEntities = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$timelineEntities = $databaseTool->query(
+    "SELECT * FROM entities WHERE user_id = ? ORDER BY created_at DESC LIMIT 20",
+    [$userId]
+);
 ?>
 
 <!DOCTYPE html>
