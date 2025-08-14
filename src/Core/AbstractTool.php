@@ -39,8 +39,24 @@ abstract class AbstractTool implements ToolInterface
      */
     public function initialize(array $config): void
     {
+        // Log initialization in debug mode
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            $className = get_class($this);
+            $configKeys = array_keys($config);
+            error_log("🔧 Initializing {$className} with config keys: " . implode(', ', $configKeys));
+        }
+        
         $this->config = array_merge($this->config, $config);
-        $this->validateConfig();
+        
+        try {
+            $this->validateConfig();
+        } catch (\Exception $e) {
+            if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                error_log("❌ Configuration validation failed for " . get_class($this) . ": " . $e->getMessage());
+                error_log("📋 Current config: " . json_encode($this->config));
+            }
+            throw $e;
+        }
     }
     
     /**

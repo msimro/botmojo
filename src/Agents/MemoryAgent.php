@@ -113,16 +113,28 @@ class MemoryAgent extends AbstractAgent
         $entityType = $data['entity_type'] ?? 'generic';
         $entityName = $data['entity_name'] ?? 'Unnamed Entity';
         $entityData = $data['entity_data'] ?? [];
+        $userId = $data['user_id'] ?? 'default_user';
+        
+        // Generate a UUID for the entity
+        $id = sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+        );
         
         // Format data for storage
         $jsonData = json_encode($entityData);
         
         // Insert into database
-        $id = $this->dbTool->insert('entities', [
+        $this->dbTool->insert('entities', [
+            'id' => $id,
+            'user_id' => $userId,
             'type' => $entityType,
-            'name' => $entityName,
-            'data' => $jsonData,
-            'created_at' => date('Y-m-d H:i:s')
+            'primary_name' => $entityName,
+            'data' => $jsonData
         ]);
         
         // Handle relationships if present
@@ -135,8 +147,7 @@ class MemoryAgent extends AbstractAgent
                     $this->dbTool->insert('relationships', [
                         'source_id' => $id,
                         'target_id' => $targetId,
-                        'type' => $relationType,
-                        'created_at' => date('Y-m-d H:i:s')
+                        'type' => $relationType
                     ]);
                 }
             }
@@ -173,12 +184,12 @@ class MemoryAgent extends AbstractAgent
         }
         
         if ($entityName) {
-            $where[] = 'name = ?';
+            $where[] = 'primary_name = ?';
             $params[] = $entityName;
         }
         
         if ($searchTerm) {
-            $where[] = '(name LIKE ? OR data LIKE ?)';
+            $where[] = '(primary_name LIKE ? OR data LIKE ?)';
             $params[] = "%{$searchTerm}%";
             $params[] = "%{$searchTerm}%";
         }

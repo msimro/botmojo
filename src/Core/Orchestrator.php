@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace BotMojo\Core;
 
 use Exception;
+use BotMojo\Exceptions\BotMojoException;
 
 /**
  * Orchestrator
@@ -34,6 +35,13 @@ class Orchestrator
     private ServiceContainer $container;
     
     /**
+     * Last input received (for error reporting)
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $lastInput = null;
+    
+    /**
      * Constructor
      *
      * @param ServiceContainer $container The service container
@@ -44,33 +52,54 @@ class Orchestrator
     }
     
     /**
-     * Handle an incoming user request
+     * Handle a user request
      *
-     * Process a request through the complete workflow and return a response.
+     * Process the user request by analyzing intent, routing to agents,
+     * and constructing a response.
      *
-     * @param array<string, mixed> $input The user request data
+     * @param array<string, mixed> $input The user input data
      *
-     * @throws Exception If the request cannot be processed
-     * @return array<string, mixed> The processed response
+     * @throws BotMojoException If processing fails
+     * @return array<string, mixed> The response data
      */
     public function handleRequest(array $input): array
     {
-        // 1. Triage Phase - Analyze user query and create execution plan
-        $plan = $this->triageRequest($input);
-        
-        // 2. Routing & Processing Phase - Execute the plan with appropriate agents
-        $results = $this->executeTaskPlan($plan);
-        
-        // 3. Assembly Phase - Combine components into unified response
-        $response = $this->assembleResponse($results, $plan);
-        
-        // 4. Storage & History Phase
-        $this->updateHistory($input, $response);
-        
-        return $response;
-    }
-    
-    /**
+        try {
+            // Store input for potential use in error handling
+            $this->lastInput = $input;
+            
+            // First, triage the request to determine intent and create a plan
+            $plan = $this->triageRequest($input);
+            
+            // Then execute the plan using appropriate agents
+            $components = $this->executeTaskPlan($plan, $input);
+            
+            // Finally, assemble the response
+            $response = $this->assembleResponse($plan, $components);
+            
+            // Add suggested response if available
+            if (!empty($plan['suggested_response'])) {
+                $response['response'] = $plan['suggested_response'];
+            }
+            
+            // Add timestamp
+            $response['timestamp'] = time();
+            
+            return $response;
+            
+        } catch (BotMojoException $e) {
+            // Re-throw BotMojo exceptions
+            throw $e;
+        } catch (\Exception $e) {
+            // Wrap general exceptions in BotMojoException
+            throw new BotMojoException(
+                "Error processing request: " . $e->getMessage(),
+                ['input' => $this->lastInput],
+                0,
+                $e
+            );
+        }
+    }    /**
      * Triage a user request using AI
      *
      * Use AI to analyze the request and generate an execution plan.

@@ -24,7 +24,7 @@ define('DB_NAME', 'assistant_core_v1');          // Database name
 // =============================================================================
 // API settings for Google's Gemini AI model integration
 define('GEMINI_API_KEY', 'AIzaSyCQA9i6FdiGTvpw7EWVsp3vYJF-agcTp10');  // Replace with your actual API key
-define('GEMINI_MODEL', 'gemini-1.5-flash');            // AI model version (fast response)
+define('GEMINI_MODEL', 'gemini-2.5-flash-lite');  // Latest available flash-lite model
 define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/' . GEMINI_MODEL . ':generateContent');
 
 // =============================================================================

@@ -37,7 +37,19 @@ class GeminiTool extends AbstractTool
      * 
      * @var string
      */
-    private const DEFAULT_MODEL = 'gemini-pro';
+    private const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+    
+    /**
+     * Fallback models in order of preference
+     * 
+     * @var array<string>
+     */
+    private const FALLBACK_MODELS = [
+        'gemini-2.5-flash-lite',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
+        'gemini-2.0-flash-lite'
+    ];
     
     /**
      * Required configuration keys
@@ -87,25 +99,81 @@ class GeminiTool extends AbstractTool
     public function generateContent(string $prompt): string
     {
         $apiKey = $this->getConfig('api_key');
-        $model = $this->getConfig('model', self::DEFAULT_MODEL);
         
         // Development fallback for testing without an API key
         if ($apiKey === 'placeholder-api-key-for-development') {
             return $this->generateDevelopmentResponse($prompt);
         }
         
+        // Get the configured model, or use default
+        $model = $this->getConfig('model', self::DEFAULT_MODEL);
+        
+        // First try with the configured model
+        try {
+            return $this->callGeminiAPI($prompt, $apiKey, $model);
+        } catch (BotMojoException $e) {
+            // Check if it's a server error (like 503)
+            if (strpos($e->getMessage(), 'HTTP code 5') !== false) {
+                if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                    error_log("⚠️ Primary model {$model} failed with server error. Trying fallback models...");
+                }
+                
+                // Try fallback models if the primary model is overloaded
+                foreach (self::FALLBACK_MODELS as $fallbackModel) {
+                    // Skip if it's the same as the one we just tried
+                    if ($fallbackModel === $model) {
+                        continue;
+                    }
+                    
+                    try {
+                        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                            error_log("🔄 Trying fallback model: {$fallbackModel}");
+                        }
+                        return $this->callGeminiAPI($prompt, $apiKey, $fallbackModel);
+                    } catch (BotMojoException $fallbackError) {
+                        // Continue to the next fallback model
+                        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                            error_log("❌ Fallback model {$fallbackModel} also failed: " . $fallbackError->getMessage());
+                        }
+                    }
+                }
+            }
+            
+            // If we reach here, all models failed or it was a non-server error
+            throw $e;
+        }
+    }
+    
+    /**
+     * Make the actual API call to Gemini
+     *
+     * @param string $prompt The prompt to send
+     * @param string $apiKey The API key to use
+     * @param string $model  The model to use
+     *
+     * @throws BotMojoException If the API call fails
+     * @return string The generated content
+     */
+    private function callGeminiAPI(string $prompt, string $apiKey, string $model): string
+    {
+        // Ensure model name has the required 'models/' prefix
+        if (strpos($model, 'models/') !== 0) {
+            $model = 'models/' . $model;
+        }
+        
         // Build the complete API URL with the model
-        $url = self::API_ENDPOINT_BASE . $model . ':generateContent?key=' . urlencode($apiKey);
+        $apiUrl = self::API_ENDPOINT_BASE . ltrim($model, 'models/') . ':generateContent';
+        $url = $apiUrl . '?key=' . urlencode($apiKey);
         
         if (defined('DEBUG_MODE') && DEBUG_MODE) {
-            error_log("🔗 Gemini API URL (without key): " . self::API_ENDPOINT_BASE . $model . ':generateContent');
+            error_log("🔗 Gemini API URL: " . $apiUrl);
+            error_log("🤖 Using model: " . $model);
             error_log("📝 Prompt length: " . strlen($prompt) . " characters");
         }
         
         $payload = json_encode([
             'contents' => [
                 [
-                    'role' => 'user',
                     'parts' => [
                         ['text' => $prompt]
                     ]
@@ -130,12 +198,25 @@ class GeminiTool extends AbstractTool
             
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
             curl_close($ch);
             
+            if ($curlError) {
+                throw new BotMojoException(
+                    "CURL error: " . $curlError,
+                    ['url' => $apiUrl]
+                );
+            }
+            
             if ($httpCode !== 200) {
+                // Log the full response for debugging
+                if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                    error_log("❌ Gemini API error. Response: " . $response);
+                }
+                
                 throw new BotMojoException(
                     "Gemini API error: HTTP code {$httpCode}",
-                    ['response' => $response, 'url' => self::API_ENDPOINT_BASE . $model . ':generateContent']
+                    ['response' => $response, 'url' => $apiUrl, 'model' => $model]
                 );
             }
             
@@ -143,18 +224,37 @@ class GeminiTool extends AbstractTool
             
             // Extract text from the response
             if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
-                return $data['candidates'][0]['content']['parts'][0]['text'];
+                $text = $data['candidates'][0]['content']['parts'][0]['text'];
+                
+                if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                    error_log("✅ Gemini API response received (" . strlen($text) . " characters)");
+                }
+                
+                return $text;
+            }
+            
+            // Log the full response for debugging
+            if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                error_log("❓ Unexpected Gemini API response format: " . $response);
             }
             
             throw new BotMojoException(
                 "Unexpected Gemini API response format",
-                ['response' => $response]
+                ['response' => $response, 'model' => $model]
             );
             
         } catch (Exception $e) {
+            if ($e instanceof BotMojoException) {
+                throw $e;
+            }
+            
+            if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                error_log("❌ Gemini API exception: " . $e->getMessage());
+            }
+            
             throw new BotMojoException(
                 "Failed to generate content: " . $e->getMessage(),
-                ['prompt' => $prompt],
+                ['prompt' => $prompt, 'model' => $model],
                 0,
                 $e
             );

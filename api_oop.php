@@ -132,11 +132,34 @@ try {
     // Register configuration
     $container->set('config', fn() => $GLOBALS['config'] ?? []);
     
-    // Get database credentials from config or environment
-    $dbHost = $GLOBALS['config']['DB_HOST'] ?? getenv('DB_HOST') ?? 'localhost';
-    $dbUser = $GLOBALS['config']['DB_USER'] ?? getenv('DB_USER') ?? 'root';
-    $dbPassword = $GLOBALS['config']['DB_PASSWORD'] ?? getenv('DB_PASSWORD') ?? '';
-    $dbName = $GLOBALS['config']['DB_NAME'] ?? getenv('DB_NAME') ?? 'botmojo';
+    // DDEV specific database credentials
+    $dbHost = 'db';  // Standard DDEV database host
+    $dbUser = 'db';  // Standard DDEV database user
+    $dbPassword = 'db';  // Standard DDEV database password
+    $dbName = 'db';  // Use the standard DDEV database name
+    
+    // Override with config values if present
+    if (defined('DB_HOST')) {
+        $dbHost = DB_HOST;
+    }
+    if (defined('DB_USER')) {
+        $dbUser = DB_USER;
+    }
+    if (defined('DB_PASS')) {
+        $dbPassword = DB_PASS;
+    }
+    if (defined('DB_NAME')) {
+        $dbName = DB_NAME;
+    }
+    
+    // Log database configuration in debug mode
+    if (DEBUG_MODE) {
+        error_log("🗄️ Database configuration:");
+        error_log("   - Host: {$dbHost}");
+        error_log("   - User: {$dbUser}");
+        error_log("   - Password: " . (empty($dbPassword) ? "(empty)" : "(set)"));
+        error_log("   - Database: {$dbName}");
+    }
     
     // Get Gemini API key from all possible sources
     $geminiApiKey = null;
@@ -188,12 +211,20 @@ try {
     
     $container->set('tool.database', function() use ($dbHost, $dbUser, $dbPassword, $dbName) {
         $tool = new DatabaseTool();
-        $tool->initialize([
-            'host' => $dbHost,
-            'user' => $dbUser,
-            'password' => $dbPassword,
-            'database' => $dbName
-        ]);
+        
+        // Ensure we have all required database settings
+        $config = [
+            'host' => $dbHost ?: 'db',         // Fallback to standard DDEV host
+            'user' => $dbUser ?: 'db',         // Fallback to standard DDEV user
+            'password' => $dbPassword ?: 'db', // Fallback to standard DDEV password
+            'database' => $dbName ?: 'db'      // Fallback to standard DDEV database
+        ];
+        
+        if (DEBUG_MODE) {
+            error_log("🔌 Initializing DatabaseTool with host={$config['host']}, user={$config['user']}, database={$config['database']}");
+        }
+        
+        $tool->initialize($config);
         return $tool;
     });
     

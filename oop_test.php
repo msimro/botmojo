@@ -168,9 +168,9 @@
                 if (data.response) {
                     // Direct response from API
                     botResponse = data.response;
-                } else if (data.plan && data.plan.response) {
+                } else if (data.plan && data.plan.suggested_response) {
                     // Response from plan
-                    botResponse = data.plan.response;
+                    botResponse = data.plan.suggested_response;
                 } else if (data.message) {
                     // Message (usually for errors)
                     botResponse = data.message;
