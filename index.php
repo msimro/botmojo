@@ -20,9 +20,9 @@
  * - Displays agent responses and debug information
  * - Links to dashboard.php for data visualization
  * 
- * @author AI Personal Assistant Team
- * @version 1.0
- * @since 2025-08-07
+ * @author BotMojo Development Team
+ * @version 2.0.0
+ * @since 2025-08-14
  * @see api.php Backend API orchestrator
  * @see dashboard.php Data visualization interface
  */
@@ -708,13 +708,18 @@
                 // Parse JSON response from backend
                 const data = await response.json();
                 
+                // Debug: Log the response structure
+                if (debugMode) {
+                    console.log('API Response:', data);
+                }
+                
                 // Handle response based on success status
-                if (data.success && data.response) {
+                if (data.status === 'success' && data.response) {
                     // Display successful assistant response
-                    addMessage(data.response, false, data.debug || data.triage_data);
+                    addMessage(data.response, false, data.debug || data.plan);
                 } else {
                     // Display error message to user
-                    const errorMsg = data.error || 'Unknown error occurred';
+                    const errorMsg = data.message || data.error || 'Unknown error occurred';
                     addMessage(`❌ Sorry, I encountered an error: ${errorMsg}`, false);
                 }
                 
