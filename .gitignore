@@ -33,6 +33,7 @@ composer.lock
 # Application logs and cache
 /logs/
 /cache/
+/cache/*
 *.log
 *.cache
 
@@ -60,7 +61,6 @@ tests/temp/
 
 # Custom BotMojo directories
 mdo
-cache
 
 # Database files (if using SQLite)
 *.sqlite
