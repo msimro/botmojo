@@ -288,3 +288,5 @@ Use the `oop_test.php` file to test the new OOP implementation alongside the ori
 - The project follows PSR-4 autoloading standards
 - All classes include proper PHPDoc comments
 - Strict typing is enforced throughout the codebase
+
+Thanks
