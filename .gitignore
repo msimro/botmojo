@@ -59,7 +59,8 @@ tests/temp/
 .github/
 
 # Custom BotMojo directories
-/mdo/
+mdo
+cache
 
 # Database files (if using SQLite)
 *.sqlite
