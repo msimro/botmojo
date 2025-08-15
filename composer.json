@@ -1,0 +1,37 @@
+{
+    "name": "botmojo/botmojo",
+    "description": "Triage-first AI personal assistant with specialized agents for comprehensive life management",
+    "type": "project",
+    "keywords": ["ai", "assistant", "personal", "gemini", "php", "agent-based"],
+    "homepage": "https://github.com/msimro/botmojo",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "BotMojo Team",
+            "email": "team@botmojo.com",
+            "homepage": "https://github.com/msimro/botmojo"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/msimro/botmojo/issues",
+        "source": "https://github.com/msimro/botmojo"
+    },
+    "autoload": {
+        "psr-4": {
+            "BotMojo\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.0",
+        "vlucas/phpdotenv": "^5.6",
+        "nesbot/carbon": "^2.72",
+        "guzzlehttp/guzzle": "^7.8",
+        "monolog/monolog": "^3.0"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

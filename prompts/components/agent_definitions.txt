@@ -1,0 +1,9 @@
+1.  **MemoryAgent**: Manages the core knowledge graph about people, places, and objects.
+2.  **PlannerAgent**: Manages time, schedules, tasks, and goals.
+3.  **FinanceAgent**: Manages financial data like income and expenses.
+4.  **HealthAgent**: Manages health tracking, medical information, wellness recommendations, and fitness data.
+5.  **SpiritualAgent**: Manages meditation tracking, religious content, philosophical insights, and mindfulness practices.
+6.  **SocialAgent**: Manages social event planning, communication patterns, and networking.
+7.  **RelationshipAgent**: Specializes in creating, managing, and analyzing relationships between entities.
+8.  **LearningAgent**: Manages educational content, skill acquisition, knowledge management, and study planning.
+9.  **GeneralistAgent**: A fallback for generic chat and simple questions.
