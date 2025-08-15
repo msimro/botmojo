@@ -86,12 +86,20 @@ define('DB_NAME', $_ENV['DB_NAME'] ?? 'db');     // Database name
 // =============================================================================
 // API settings for Google's Gemini AI model integration
 
-// Try multiple ways to get the API key with direct fallback to the known key if needed
-$apiKey = $_ENV['API_KEY'] ?? getenv('API_KEY') ?? 'AIzaSyDT4xnhgri4bp_SvWDlLDHREPtgfXexKOw';
+// Get API key from environment variables
+$apiKey = $_ENV['API_KEY'] ?? getenv('API_KEY');
+if (empty($apiKey)) {
+    throw new \RuntimeException('API_KEY environment variable is required');
+}
 define('GEMINI_API_KEY', $apiKey);
 
-// Get model with fallback
-define('GEMINI_MODEL', $_ENV['DEFAULT_MODEL'] ?? getenv('DEFAULT_MODEL') ?? 'gemini-2.5-flash-lite');
+// Get model with validation
+$model = $_ENV['DEFAULT_MODEL'] ?? getenv('DEFAULT_MODEL') ?? 'gemini-2.5-flash-lite';
+$validModels = ['gemini-2.5-flash-lite', 'gemini-2.5-flash-pro', 'gemini-2.5-vision'];
+if (!in_array($model, $validModels)) {
+    throw new \RuntimeException('Invalid model specified. Allowed models: ' . implode(', ', $validModels));
+}
+define('GEMINI_MODEL', $model);
 define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/' . GEMINI_MODEL . ':generateContent');
 
 // Log API configuration if in debug mode

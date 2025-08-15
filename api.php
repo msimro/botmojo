@@ -49,10 +49,15 @@ ob_start();
 // Set headers if not already sent
 if (!headers_sent()) {
     header('Content-Type: application/json; charset=utf-8');
-    header('Access-Control-Allow-Origin: *'); // TODO: Restrict in production
+    header('Access-Control-Allow-Origin: ' . ($_ENV['ALLOWED_ORIGINS'] ?? 'https://botmojo.com'));
     header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Authorization');
     header('Cache-Control: no-cache, must-revalidate');
+    
+    // Add security headers
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('X-XSS-Protection: 1; mode=block');
 }
 
 // Initialize logger
