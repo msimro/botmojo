@@ -25,17 +25,52 @@ try {
     // Require critical variables to be set
     $dotenv->required(['API_KEY', 'DB_HOST', 'DB_NAME']);
 } catch (\Exception $e) {
-    // In production, this should be logged properly
+    // Log the error
+    error_log(json_encode([
+        'error' => 'Environment configuration error',
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+        'trace' => $e->getTraceAsString()
+    ]));
+    
+    // In development, we can show more details
     if ($_ENV['DEBUG_MODE'] ?? false) {
-        error_log("Environment configuration error: " . $e->getMessage());
+        throw new \RuntimeException(
+            "Environment configuration error: " . $e->getMessage(),
+            0,
+            $e
+        );
     }
-    // Don't expose configuration errors in production
+    
+    // In production, throw a generic error
+    throw new \RuntimeException(
+        "Application configuration error. Please contact support.",
+        500
+    );
 }
 
 // Set default timezone from env or use fallback
 $timezone = $_ENV['TIMEZONE'] ?? 'America/New_York';
 date_default_timezone_set($timezone);
 Carbon::setLocale('en');
+
+// =============================================================================
+// ERROR HANDLING CONFIGURATION
+// =============================================================================
+
+// Prevent display of errors in production
+ini_set('display_errors', $_ENV['DEBUG_MODE'] ?? '0');
+ini_set('display_startup_errors', $_ENV['DEBUG_MODE'] ?? '0');
+error_reporting($_ENV['DEBUG_MODE'] ? E_ALL : 0);
+
+// Custom error handler to convert PHP errors to exceptions
+set_error_handler(function ($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) {
+        return false;
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
 
 // =============================================================================
 // DATABASE CONFIGURATION

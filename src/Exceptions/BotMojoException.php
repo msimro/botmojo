@@ -28,6 +28,18 @@ class BotMojoException extends \Exception
     protected array $context = [];
 
     /**
+     * Set additional context for the exception
+     *
+     * @param array<string, mixed> $context
+     * @return self
+     */
+    public function setContext(array $context): self
+    {
+        $this->context = $context;
+        return $this;
+    }
+
+    /**
      * Constructor
      *
      * @param string          $message  The error message

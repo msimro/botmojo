@@ -88,10 +88,10 @@ class Orchestrator
         } catch (\Exception $e) {
             // Wrap general exceptions in BotMojoException
             throw new BotMojoException(
-                "Error processing request: " . $e->getMessage(),
-                ['input' => $this->lastInput],
-                0,
-                $e
+                'Error executing plan',
+                500,
+                $e,
+                ['input' => $this->lastInput]
             );
         }
     }
@@ -260,8 +260,19 @@ class Orchestrator
             }
             
             try {
-                // Get the agent from the container
-                $agent = $this->container->get($serviceName);
+                // Get the agent factory from the container
+                $agentFactory = $this->container->get($serviceName);
+                
+                // Create the agent instance
+                $agent = $agentFactory();
+                
+                if (!is_object($agent)) {
+                    throw new \RuntimeException("Agent factory for '{$agentName}' did not return an object");
+                }
+                
+                if (!method_exists($agent, 'process')) {
+                    throw new \RuntimeException("Agent '{$agentName}' does not implement process method");
+                }
                 
                 // Process the task with the agent
                 $taskResults = $agent->process($data);

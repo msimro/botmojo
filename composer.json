@@ -18,7 +18,14 @@
     },
     "autoload": {
         "psr-4": {
-            "BotMojo\\": "src/"
+            "BotMojo\\": "src/",
+            "BotMojo\\Agents\\": ["agents/*/", "src/Agents/"],
+            "BotMojo\\Tools\\": ["tools/*/", "src/Tools/"],
+            "BotMojo\\Core\\": "src/Core/",
+            "BotMojo\\Config\\": "src/Config/",
+            "BotMojo\\Request\\": "src/Request/",
+            "BotMojo\\Response\\": "src/Response/",
+            "BotMojo\\Orchestration\\": "src/Orchestration/"
         }
     },
     "require": {

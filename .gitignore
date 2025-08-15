@@ -32,7 +32,9 @@ composer.lock
 
 # Application logs and cache
 /logs/
+cache
 /cache/
+cache/*
 /cache/*
 *.log
 *.cache
@@ -58,9 +60,11 @@ tests/temp/
 
 # GitHub specific
 .github/
+.github/*
 
 # Custom BotMojo directories
 mdo
+mdo/*
 
 # Database files (if using SQLite)
 *.sqlite

@@ -24,30 +24,39 @@ use BotMojo\Exceptions\BotMojoException;
 class ServiceContainer
 {
     /**
+     * Service definitions
+     *
+     * @var array<string, callable>
+     */
+    private array $definitions = [];
+
+    /**
      * Resolved service instances
      *
-     * @var array<string, mixed>
+     * @var array<string, object>
      */
     private array $services = [];
 
     /**
-     * Service factory callbacks
+     * Register a service definition
      *
-     * @var array<string, callable>
+     * @param string   $id       The service identifier
+     * @param callable $factory  The factory function that creates the service
      */
-    private array $factories = [];
+    public function register(string $id, callable $factory): void
+    {
+        $this->definitions[$id] = $factory;
+    }
 
     /**
-     * Register a service factory
+     * Set a service instance directly
      *
-     * @param string   $name    The service identifier
-     * @param callable $factory The factory callback that creates the service
-     *
-     * @return void
+     * @param string $id      The service identifier
+     * @param object $service The service instance
      */
-    public function set(string $name, callable $factory): void
+    public function set(string $id, object $service): void
     {
-        $this->factories[$name] = $factory;
+        $this->services[$id] = $service;
     }
 
     /**
@@ -55,38 +64,42 @@ class ServiceContainer
      *
      * If the service doesn't exist yet, it will be created using its factory
      *
-     * @param string $name The service identifier
+     * @param string $id The service identifier
      *
      * @throws BotMojoException If the service is not registered or cannot be created
-     * @return mixed The service instance
+     * @return object The service instance
      */
-    public function get(string $name): mixed
+    public function get(string $id): object
     {
-        if (!isset($this->services[$name])) {
-            if (!isset($this->factories[$name])) {
-                throw new BotMojoException(
-                    sprintf("Service '%s' not found", $name),
-                    0,
-                    null,
-                    ['service' => $name]
-                );
-            }
-            
+        // Return existing instance if available
+        if (isset($this->services[$id])) {
+            return $this->services[$id];
+        }
+
+        // Create new instance if definition exists
+        if (isset($this->definitions[$id])) {
             try {
-                $this->services[$name] = $this->factories[$name]($this);
+                $this->services[$id] = ($this->definitions[$id])($this);
+                return $this->services[$id];
             } catch (\Throwable $e) {
                 throw new BotMojoException(
-                    sprintf("Failed to create service '%s': %s", $name, $e->getMessage()),
+                    sprintf("Failed to create service '%s': %s", $id, $e->getMessage()),
                     (int) $e->getCode(),
                     $e,
                     [
-                        'service' => $name,
+                        'service' => $id,
                         'trace' => $e->getTraceAsString()
                     ]
                 );
             }
         }
-        return $this->services[$name];
+
+        throw new BotMojoException(
+            sprintf("Service '%s' not found", $id),
+            0,
+            null,
+            ['service' => $id]
+        );
     }
     
     /**
