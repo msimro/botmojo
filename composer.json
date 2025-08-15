@@ -39,6 +39,16 @@
         "optimize-autoloader": true,
         "sort-packages": true
     },
+    "scripts": {
+        "post-install-cmd": [
+            "mkdir -p cache logs",
+            "chmod -R 770 cache logs"
+        ],
+        "post-update-cmd": [
+            "mkdir -p cache logs",
+            "chmod -R 770 cache logs"
+        ]
+    },
     "minimum-stability": "stable",
     "prefer-stable": true
 }

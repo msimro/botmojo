@@ -80,15 +80,14 @@ docker-compose*.yaml
 # ==============================================
 # Application Files
 # ==============================================
-# Logs
-/logs/*
-!/logs/.gitkeep
+# Logs - Create directory with: mkdir -p logs
+/logs/
 *.log
 
-# Cache
-/cache/*
-!/cache/.gitkeep
+# Cache - Create directory with: mkdir -p cache
+/cache/
 *.cache
+*.cache.php
 
 # Runtime data
 /runtime/
