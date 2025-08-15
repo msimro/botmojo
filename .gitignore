@@ -1,52 +1,149 @@
-# OS generated files
+# ==============================================
+# Operating System Files
+# ==============================================
+# macOS
 .DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
-Thumbs.db
+.AppleDouble
+.LSOverride
+Icon\r\r
 
-# IDE and editor folders
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ==============================================
+# IDE and Editor Files
+# ==============================================
+# VS Code
 .vscode/
+*.code-workspace
+
+# PHPStorm
 .idea/
-*.sublime-workspace
-*.sublime-project
+.idea_modules/
+*.iml
+*.ipr
+*.iws
 .phpstorm.meta.php
 _ide_helper.php
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ==============================================
+# PHP Development
+# ==============================================
+# Composer
+/vendor/
+composer.phar
+/composer.lock
+/.php-cs-fixer.cache
 .phpunit.result.cache
 
-# Development environment
+# PHP CS Fixer
+.php-cs-fixer.cache
+.php_cs.cache
+.php_cs
+
+# PHPUnit
+/phpunit.xml
+.phpunit.cache/
+coverage/
+.coverage/
+coverage.xml
+
+# ==============================================
+# Development Environment
+# ==============================================
+# DDEV
 .ddev/
 .docker/
-docker-compose.override.yml
-
-# Composer dependencies
-/vendor/
-composer.lock
+docker-compose*.yml
+docker-compose*.yaml
 
 # Environment files
 .env
 .env.*
 !.env.example
+!.env.testing
 
-# Application logs and cache
-/logs/
-cache
-/cache/
-cache/*
-/cache/*
+# ==============================================
+# Application Files
+# ==============================================
+# Logs
+/logs/*
+!/logs/.gitkeep
 *.log
+
+# Cache
+/cache/*
+!/cache/.gitkeep
 *.cache
 
-# Legacy backups (migration artifacts)
-/backup/
-
-# Temporary and runtime files
+# Runtime data
+/runtime/
 /tmp/
 /temp/
-/storage/logs/
-/storage/cache/
+
+# Storage (user uploads, generated files)
+/storage/*
+!/storage/.gitkeep
+
+# Build artifacts
+/public/build/
+/public/hot/
+/public/storage
+/public/css/
+/public/js/
+/public/mix-manifest.json
+
+# ==============================================
+# Node.js (if using for frontend)
+# ==============================================
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.npm/
+.yarn/
+.pnp.*
+
+# ==============================================
+# Project Specific
+# ==============================================
+# Gemini API keys and secrets
+gemini_credentials.json
+*_credentials.json
+*.key
+
+# Conversation cache files
+/cache/conv_*.json
+conversation_index.json
+default_conversation.json
+
+# Local development files
+local_dev.php
+*.local.php
+/config/*.local.php
+
+# Backup files
+*.bak
+*.swp
+*.swo
+*~
+*.old
+*.orig
+/backup/
 
 # Build directories
 /build/
