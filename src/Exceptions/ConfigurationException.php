@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace BotMojo\Exceptions;
 
-use Exception;
-
 /**
  * Configuration Exception
  *
@@ -27,25 +25,25 @@ class ConfigurationException extends BotMojoException
      *
      * @var array<string>
      */
-    private array $missingKeys;
+    private array $missingKeys = [];
 
     /**
      * Constructor
      *
-     * @param string               $message     The exception message
-     * @param array<string>        $missingKeys Array of missing configuration keys
-     * @param array<string, mixed> $context     Additional context data
-     * @param int                  $code        The exception code
-     * @param Exception|null       $previous    The previous exception
+     * @param string          $message     The error message
+     * @param int            $code        The error code (optional)
+     * @param \Throwable|null $previous    The previous throwable used for exception chaining
+     * @param array          $context     Additional context data (optional)
+     * @param array<string>  $missingKeys Array of missing configuration keys (optional)
      */
     public function __construct(
         string $message,
-        array $missingKeys = [],
-        array $context = [],
         int $code = 0,
-        ?Exception $previous = null
+        ?\Throwable $previous = null,
+        array $context = [],
+        array $missingKeys = []
     ) {
-        parent::__construct($message, $context, $code, $previous);
+        parent::__construct($message, $code, $previous, $context);
         $this->missingKeys = $missingKeys;
     }
 

@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace BotMojo\Core;
 
-use Exception;
+use BotMojo\Exceptions\BotMojoException;
 
 /**
  * Service Container
@@ -57,16 +57,34 @@ class ServiceContainer
      *
      * @param string $name The service identifier
      *
-     * @throws Exception If the service is not registered
+     * @throws BotMojoException If the service is not registered or cannot be created
      * @return mixed The service instance
      */
-    public function get(string $name)
+    public function get(string $name): mixed
     {
         if (!isset($this->services[$name])) {
             if (!isset($this->factories[$name])) {
-                throw new Exception("Service '{$name}' not found.");
+                throw new BotMojoException(
+                    sprintf("Service '%s' not found", $name),
+                    0,
+                    null,
+                    ['service' => $name]
+                );
             }
-            $this->services[$name] = $this->factories[$name]($this);
+            
+            try {
+                $this->services[$name] = $this->factories[$name]($this);
+            } catch (\Throwable $e) {
+                throw new BotMojoException(
+                    sprintf("Failed to create service '%s': %s", $name, $e->getMessage()),
+                    (int) $e->getCode(),
+                    $e,
+                    [
+                        'service' => $name,
+                        'trace' => $e->getTraceAsString()
+                    ]
+                );
+            }
         }
         return $this->services[$name];
     }

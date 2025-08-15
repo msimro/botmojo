@@ -22,6 +22,40 @@ namespace BotMojo\Core;
 abstract class AbstractAgent implements AgentInterface
 {
     /**
+     * Service container instance
+     *
+     * @var ServiceContainer
+     */
+    protected ServiceContainer $container;
+
+    /**
+     * Logger instance
+     *
+     * @var \Psr\Log\LoggerInterface
+     */
+    protected \Psr\Log\LoggerInterface $logger;
+
+    /**
+     * Agent configuration
+     *
+     * @var array<string, mixed>
+     */
+    protected array $config;
+
+    /**
+     * Constructor
+     *
+     * @param ServiceContainer $container Service container for dependency injection
+     * @param array<string, mixed> $config Agent configuration
+     */
+    public function __construct(ServiceContainer $container, array $config = [])
+    {
+        $this->container = $container;
+        $this->config = $config;
+        $this->logger = $container->get('logger');
+    }
+
+    /**
      * Process a task from the execution plan
      *
      * Default implementation that delegates to createComponent
@@ -32,7 +66,10 @@ abstract class AbstractAgent implements AgentInterface
      */
     public function process(array $taskData): array
     {
-        return $this->createComponent($taskData);
+        $this->log('process_start', $taskData);
+        $result = $this->createComponent($taskData);
+        $this->log('process_complete', $result);
+        return $result;
     }
     
     /**
@@ -47,7 +84,12 @@ abstract class AbstractAgent implements AgentInterface
      */
     protected function log(string $action, array $data): void
     {
-        // In a more complete implementation, this would use a logging tool
+        $context = [
+            'agent' => static::class,
+            'action' => $action,
+            'data' => $data
+        ];
+        $this->logger->info(sprintf('[Agent] %s: %s', static::class, $action), $context);
         // For now, it's a placeholder for future implementation
         
         // Example:

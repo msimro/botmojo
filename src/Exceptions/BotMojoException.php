@@ -13,14 +13,12 @@ declare(strict_types=1);
 
 namespace BotMojo\Exceptions;
 
-use Exception;
-
 /**
  * BotMojo Exception
  *
  * Base exception class for all BotMojo-specific exceptions
  */
-class BotMojoException extends Exception
+class BotMojoException extends \Exception
 {
     /**
      * Additional context data
@@ -28,25 +26,25 @@ class BotMojoException extends Exception
      * @var array<string, mixed>
      */
     protected array $context = [];
-    
+
     /**
      * Constructor
      *
-     * @param string               $message  The exception message
-     * @param array<string, mixed> $context  Additional context data
-     * @param int                  $code     The exception code
-     * @param Exception|null       $previous The previous exception
+     * @param string          $message  The error message
+     * @param int            $code     The error code (optional)
+     * @param \Throwable|null $previous The previous throwable used for exception chaining
+     * @param array          $context  Additional context data (optional)
      */
     public function __construct(
         string $message,
-        array $context = [],
         int $code = 0,
-        ?Exception $previous = null
+        ?\Throwable $previous = null,
+        array $context = []
     ) {
         parent::__construct($message, $code, $previous);
         $this->context = $context;
     }
-    
+
     /**
      * Get context data
      *
