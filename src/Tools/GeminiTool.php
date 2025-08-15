@@ -35,7 +35,18 @@ class GeminiTool extends AbstractTool
      *
      * @var string
      */
-    private const API_ENDPOINT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
+    private const API_ENDPOINT_BASE = 'https://generativelanguage.googleapis.com/v1beta/';
+
+    /**
+     * Token usage tracking
+     *
+     * @var array<string, int>
+     */
+    private array $tokenUsage = [
+        'prompt' => 0,
+        'completion' => 0,
+        'total' => 0
+    ];
     
     /**
      * Default model to use if none specified
@@ -45,15 +56,41 @@ class GeminiTool extends AbstractTool
     private const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
     
     /**
-     * Fallback models in order of preference
+     * Available models and their endpoints
      * 
+     * @var array<string, string>
+     */
+    private const MODELS = [
+        'gemini-2.5-flash-lite' => 'gemini-2.5-flash-lite',
+        'gemini-1.5-flash' => 'gemini-1.5-flash',
+        'gemini-1.5-pro' => 'gemini-1.5-pro',
+        'gemini-2.0-flash-lite' => 'gemini-2.0-flash-lite',
+        'gemini-1.0-pro' => 'gemini-1.0-pro'
+    ];
+
+    /**
+     * Model names without any prefix
+     *
      * @var array<string>
      */
-    private const FALLBACK_MODELS = [
+    private const MODEL_NAMES = [
         'gemini-2.5-flash-lite',
         'gemini-1.5-flash',
         'gemini-1.5-pro',
-        'gemini-2.0-flash-lite'
+        'gemini-2.0-flash-lite',
+        'gemini-1.0-pro'
+    ];
+    
+    /**
+     * Default safety settings
+     * 
+     * @var array<string, string>
+     */
+    private const DEFAULT_SAFETY_SETTINGS = [
+        'HARM_CATEGORY_HARASSMENT' => 'BLOCK_MEDIUM_AND_ABOVE',
+        'HARM_CATEGORY_HATE_SPEECH' => 'BLOCK_MEDIUM_AND_ABOVE',
+        'HARM_CATEGORY_SEXUALLY_EXPLICIT' => 'BLOCK_MEDIUM_AND_ABOVE',
+        'HARM_CATEGORY_DANGEROUS_CONTENT' => 'BLOCK_MEDIUM_AND_ABOVE'
     ];
     
     /**
@@ -128,8 +165,9 @@ class GeminiTool extends AbstractTool
             
             throw new ConfigurationException(
                 $message,
-                $missingKeys,
-                ['tool' => 'GeminiTool']
+                500,
+                null,
+                ['missing_keys' => $missingKeys, 'tool' => 'GeminiTool']
             );
         }
     }
@@ -167,21 +205,26 @@ class GeminiTool extends AbstractTool
                 }
                 
                 // Try fallback models if the primary model failed
-                foreach (self::FALLBACK_MODELS as $fallbackModel) {
-                    // Skip if it's the same as the one we just tried
-                    if ($fallbackModel === $model) {
-                        continue;
-                    }
-                    
+                // Try alternative model if gemini-pro fails
+                if ($model === 'gemini-2.5-flash-lite') {
                     try {
                         if (defined('DEBUG_MODE') && DEBUG_MODE) {
-                            error_log("🔄 Trying fallback model: {$fallbackModel}");
+                            error_log("🔄 Trying alternative model: gemini-1.5-pro");
                         }
-                        return $this->callGeminiAPI($prompt, $apiKey, $fallbackModel);
+                        return $this->callGeminiAPI($prompt, $apiKey, 'gemini-1.5-pro');
                     } catch (BotMojoException $fallbackError) {
-                        // Continue to the next fallback model
                         if (defined('DEBUG_MODE') && DEBUG_MODE) {
-                            error_log("❌ Fallback model {$fallbackModel} also failed: " . $fallbackError->getMessage());
+                            error_log("❌ Alternative model also failed: " . $fallbackError->getMessage());
+                            error_log("🔄 Trying final fallback model: gemini-1.0-pro");
+                        }
+                        // Try one last time with gemini-1.0-pro
+                        try {
+                            return $this->callGeminiAPI($prompt, $apiKey, 'gemini-1.0-pro');
+                        } catch (BotMojoException $finalError) {
+                            if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                                error_log("❌ Final fallback model also failed: " . $finalError->getMessage());
+                            }
+                            throw $finalError;
                         }
                     }
                 }
@@ -202,25 +245,56 @@ class GeminiTool extends AbstractTool
      * @throws BotMojoException If the API call fails
      * @return string The generated content
      */
-    private function callGeminiAPI(string $prompt, string $apiKey, string $model): string
+    private function callGeminiAPI(string $prompt, string $apiKey, string $model, array $extraParts = []): string
     {
-        // Ensure model name has the required 'models/' prefix
-        if (strpos($model, 'models/') !== 0) {
-            $model = 'models/' . $model;
+        // Validate the model name
+        if (!in_array($model, self::MODEL_NAMES, true)) {
+            throw new BotMojoException(
+                'Invalid model specified',
+                400,
+                null,
+                [
+                    'model' => $model,
+                    'available_models' => self::MODEL_NAMES
+                ]
+            );
         }
         
         // Build the complete API URL with the model
-        $modelName = ltrim($model, 'models/');
-        $apiUrl = self::API_ENDPOINT_BASE . $modelName . ':generateContent';
+        $apiUrl = self::API_ENDPOINT_BASE . 'models/' . $model . ':generateContent';
         $url = $apiUrl . '?key=' . urlencode($apiKey);
         
         if (defined('DEBUG_MODE') && DEBUG_MODE) {
-            error_log("🔗 Using Gemini model: " . $modelName);
+            error_log("🔗 Using Gemini model: " . $model);
             error_log("📝 Prompt length: " . strlen($prompt) . " characters");
         }
+
+        // Build the parts array
+        $parts = [['text' => $prompt]];
         
-        // Build standard payload with safety settings
-        $payload = json_encode([
+        // Add any extra parts (e.g., images)
+        if (!empty($extraParts)) {
+            foreach ($extraParts as $type => $data) {
+                if ($type === 'image') {
+                    $parts[] = [
+                        'inline_data' => [
+                            'mime_type' => $data['mime_type'],
+                            'data' => $data['data']
+                        ]
+                    ];
+                }
+            }
+        }
+        
+            // Build standard payload with safety settings
+        $generationConfig = [
+            'temperature' => $this->config['temperature'] ?? 0.4,
+            'topP' => $this->config['top_p'] ?? 0.8,
+            'topK' => $this->config['top_k'] ?? 40,
+            'maxOutputTokens' => $this->config['max_output_tokens'] ?? 1024,
+        ];
+
+        $payload = [
             'contents' => [
                 [
                     'parts' => [
@@ -228,15 +302,12 @@ class GeminiTool extends AbstractTool
                     ]
                 ]
             ],
-            'generationConfig' => [
-                'temperature' => 0.4,
-                'topP' => 0.8,
-                'topK' => 40,
-                'maxOutputTokens' => 1024,
-            ]
-        ]);
-        
-        try {
+            'generationConfig' => $generationConfig,
+            'safetySettings' => $this->buildSafetySettings()
+        ];
+
+        // Convert to JSON
+        $payload = json_encode($payload);        try {
             // Use Guzzle HTTP client
             $client = new Client([
                 'timeout' => 30,
@@ -263,7 +334,7 @@ class GeminiTool extends AbstractTool
                 error_log("❌ Gemini API error. HTTP Code: " . $httpCode);
                 error_log("❌ Response: " . $responseBody);
                 error_log("❌ API Key used: " . substr($apiKey, 0, 5) . "..." . substr($apiKey, -5));
-                error_log("❌ Model: " . $modelName);
+                error_log("❌ Model: " . $model);
                 
                 // Try to parse the error response
                 $errorData = json_decode($responseBody, true);
@@ -281,9 +352,11 @@ class GeminiTool extends AbstractTool
                 
                 throw new BotMojoException(
                     "Gemini API error: " . $errorMessage,
+                    $httpCode,
+                    null,
                     [
                         'response' => $responseBody, 
-                        'model' => $modelName,
+                        'model' => $model,
                         'http_code' => $httpCode,
                         'api_key_valid' => !empty($apiKey)
                     ]
@@ -310,7 +383,9 @@ class GeminiTool extends AbstractTool
             
             throw new BotMojoException(
                 "Unexpected Gemini API response format",
-                ['response' => $responseBody, 'model' => $modelName]
+                500,
+                null,
+                ['response' => $responseBody, 'model' => $model]
             );
             
         } catch (RequestException $e) {
@@ -321,7 +396,9 @@ class GeminiTool extends AbstractTool
             
             throw new BotMojoException(
                 "Failed to connect to Gemini API: " . $e->getMessage(),
-                ['url' => $url, 'model' => $modelName]
+                500,
+                $e,
+                ['url' => $url, 'model' => $model]
             );
             
         } catch (Exception $e) {
@@ -336,13 +413,207 @@ class GeminiTool extends AbstractTool
             
             throw new BotMojoException(
                 "Failed to generate content: " . $e->getMessage(),
-                ['model' => $modelName],
-                0,
-                $e
+                500,
+                $e,
+                ['model' => $model]
             );
         }
     }
     
+    /**
+     * Build safety settings array for API requests
+     *
+     * @return array<array<string, string>> Formatted safety settings
+     */
+    private function buildSafetySettings(): array
+    {
+        $settings = $this->config['safety_settings'] ?? self::DEFAULT_SAFETY_SETTINGS;
+        $safetySettings = [];
+
+        foreach ($settings as $category => $threshold) {
+            $safetySettings[] = [
+                'category' => $category,
+                'threshold' => $threshold
+            ];
+        }
+
+        return $safetySettings;
+    }
+
+    /**
+     * Generate content from an image
+     *
+     * @param string $prompt    The text prompt
+     * @param string $imagePath The path to the image file
+     * @throws BotMojoException If the image file is invalid or API call fails
+     * @return string The generated content
+     */
+    public function generateFromImage(string $prompt, string $imagePath): string
+    {
+        if (!file_exists($imagePath)) {
+            throw new BotMojoException(
+                'Image file not found',
+                400,
+                null,
+                ['path' => $imagePath]
+            );
+        }
+
+        $mimeType = mime_content_type($imagePath);
+        if (!str_starts_with($mimeType, 'image/')) {
+            throw new BotMojoException(
+                'Invalid file type. Only images are supported.',
+                400,
+                null,
+                ['mime_type' => $mimeType]
+            );
+        }
+
+        // Read and encode image
+        $imageData = base64_encode(file_get_contents($imagePath));
+
+        // Get API key and make call
+        $apiKey = $this->getConfig('api_key');
+
+        if ($apiKey === 'placeholder-api-key-for-development') {
+            return $this->generateDevelopmentResponse($prompt . ' [Image analysis request]');
+        }
+
+        try {
+            return $this->callGeminiAPI(
+                $prompt,
+                $apiKey,
+                'gemini-pro-vision',
+                [
+                    'image' => [
+                        'mime_type' => $mimeType,
+                        'data' => $imageData
+                    ]
+                ]
+            );
+        } catch (Exception $e) {
+            throw new BotMojoException(
+                'Failed to generate content from image',
+                500,
+                $e,
+                [
+                    'image_path' => $imagePath,
+                    'mime_type' => $mimeType
+                ]
+            );
+        }
+    }
+
+    /**
+     * Stream generated content
+     *
+     * @param string   $prompt   The text prompt
+     * @param callable $callback Function to call with each chunk of text
+     * @throws BotMojoException If streaming fails
+     */
+    public function streamGeneration(string $prompt, callable $callback): void
+    {
+        $apiKey = $this->getConfig('api_key');
+
+        if ($apiKey === 'placeholder-api-key-for-development') {
+            $callback($this->generateDevelopmentResponse($prompt));
+            return;
+        }
+
+        $model = $this->getConfig('model', self::DEFAULT_MODEL);
+        
+        // Ensure we have a valid model name
+        if (!isset(self::MODELS[$model])) {
+            throw new BotMojoException(
+                'Invalid model specified',
+                400,
+                null,
+                [
+                    'model' => $model,
+                    'available_models' => array_keys(self::MODELS)
+                ]
+            );
+        }
+
+        // Get the API URL with the model path
+        $url = self::API_ENDPOINT_BASE . 'models/' . $model . ':streamGenerateContent?key=' . urlencode($apiKey);
+
+        $generationConfig = [
+            'temperature' => $this->config['temperature'] ?? 0.4,
+            'topP' => $this->config['top_p'] ?? 0.8,
+            'topK' => $this->config['top_k'] ?? 40,
+            'maxOutputTokens' => $this->config['max_output_tokens'] ?? 1024,
+        ];
+
+        $payload = [
+            'contents' => [
+                [
+                    'parts' => [
+                        ['text' => $prompt]
+                    ]
+                ]
+            ],
+            'generationConfig' => $generationConfig,
+            'safetySettings' => $this->buildSafetySettings()
+        ];
+
+        try {
+            $client = new Client([
+                'timeout' => 0,  // No timeout for streaming
+                'connect_timeout' => 10
+            ]);
+
+            $response = $client->post($url, [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'text/event-stream'
+                ],
+                'json' => $payload,
+                'stream' => true
+            ]);
+
+            $buffer = '';
+            foreach ($response->getBody() as $chunk) {
+                $buffer .= $chunk;
+                
+                if (($pos = strrpos($buffer, "\n")) !== false) {
+                    $complete = substr($buffer, 0, $pos);
+                    $buffer = substr($buffer, $pos + 1);
+                    
+                    foreach (explode("\n", $complete) as $line) {
+                        if (trim($line) === '') {
+                            continue;
+                        }
+                        
+                        $data = json_decode($line, true);
+                        if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+                            $callback($data['candidates'][0]['content']['parts'][0]['text']);
+                        }
+                    }
+                }
+            }
+
+            // Process any remaining data
+            if (trim($buffer) !== '') {
+                $data = json_decode($buffer, true);
+                if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+                    $callback($data['candidates'][0]['content']['parts'][0]['text']);
+                }
+            }
+
+        } catch (Exception $e) {
+            throw new BotMojoException(
+                'Streaming generation failed',
+                500,
+                $e,
+                [
+                    'model' => $model,
+                    'error' => $e->getMessage()
+                ]
+            );
+        }
+    }
+
     /**
      * Generate a development response for testing without an API key
      *
@@ -372,5 +643,27 @@ class GeminiTool extends AbstractTool
         // For other requests, return a simple text response
         return "I'm running in development mode without a valid Gemini API key. " .
                "To use BotMojo fully, please set up a valid API key in config.php or as an environment variable.";
+    }
+
+    /**
+     * Get token usage statistics
+     *
+     * @return array<string, int> Token usage stats
+     */
+    public function getTokenUsage(): array
+    {
+        return $this->tokenUsage;
+    }
+
+    /**
+     * Reset token usage statistics
+     */
+    public function resetTokenUsage(): void
+    {
+        $this->tokenUsage = [
+            'prompt' => 0,
+            'completion' => 0,
+            'total' => 0
+        ];
     }
 }
